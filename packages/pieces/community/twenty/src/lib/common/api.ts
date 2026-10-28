@@ -4,7 +4,7 @@ import { twentyClient } from './client';
 
 import type {
   FilterCondition,
-  FilterValue,
+  FieldValue,
   TwentyAuthValue,
   TwentyDuplicateConnection,
   TwentyEnvelope,
@@ -192,6 +192,41 @@ async function findCustomObject({
     path: recordsPath({ objectNamePlural }),
     query: filterQuery({ conditions }),
   });
+}
+
+async function createCustomObject({
+  auth,
+  objectNamePlural,
+  record,
+}: {
+  auth: TwentyAuthValue;
+  objectNamePlural: string;
+  record: Record<string, unknown>;
+}): Promise<TwentyRecord | undefined> {
+  return await createRecord({ auth, objectNamePlural, record });
+}
+
+async function updateCustomObject({
+  auth,
+  objectNamePlural,
+  recordId,
+  record,
+  replaceArrays,
+}: RecordParams & {
+  auth: TwentyAuthValue;
+  record: Record<string, unknown>;
+  replaceArrays: boolean;
+}): Promise<TwentyRecord | undefined> {
+  if (Object.keys(record).length === 0)
+    return await getRecord({ auth, objectNamePlural, recordId });
+
+  const body = replaceArrays
+    ? record
+    : appendArrayFields({
+        record,
+        existing: await getRecord({ auth, objectNamePlural, recordId }),
+      });
+  return await updateRecord({ auth, objectNamePlural, recordId, record: body });
 }
 
 async function listRecentCompanies({
@@ -703,7 +738,7 @@ function filterQuery({
   conditions: FilterCondition[];
 }): QueryParams {
   const filter = conditions
-    .filter(({ value }) => !isEmptyFilterValue({ value }))
+    .filter(({ value }) => !isEmptyFieldValue({ value }))
     .map(
       ({ field, operator, value }) =>
         `${field}[${operator}]:${
@@ -714,15 +749,32 @@ function filterQuery({
   return filter ? { filter } : {};
 }
 
-function isEmptyFilterValue({
+function isEmptyFieldValue({
   value,
 }: {
-  value: FilterValue | undefined;
+  value: FieldValue | undefined;
 }): boolean {
   return (
     value === undefined ||
     value === '' ||
     (Array.isArray(value) && value.length === 0)
+  );
+}
+
+function appendArrayFields({
+  record,
+  existing,
+}: {
+  record: Record<string, unknown>;
+  existing: TwentyRecord | undefined;
+}): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(record).map(([field, value]) => {
+      const current = existing?.[field];
+      return Array.isArray(value) && Array.isArray(current)
+        ? [field, [...new Set([...current, ...value])]]
+        : [field, value];
+    })
   );
 }
 
@@ -769,6 +821,8 @@ export const twentyApi = {
   findCompanies,
   findPeople,
   findCustomObject,
+  createCustomObject,
+  updateCustomObject,
   listRecentCompanies,
   listRecentPeople,
   updateCompany,

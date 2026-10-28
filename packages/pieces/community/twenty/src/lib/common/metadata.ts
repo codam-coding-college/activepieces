@@ -1,5 +1,6 @@
 import { twentyApi } from './api';
 import {
+  FieldPurpose,
   SelectOption,
   TwentyAuthValue,
   TwentyMetadataField,
@@ -102,11 +103,11 @@ function getJoinColumnName({
   return typeof joinColumnName === 'string' ? joinColumnName : undefined;
 }
 
-function resolveFilterTarget({
+function resolveFieldTarget({
   field,
 }: {
   field: TwentyMetadataField;
-}): FilterTarget | undefined {
+}): FieldTarget | undefined {
   const label =
     typeof field['label'] === 'string' ? field['label'] : field.name;
   if (field.type !== 'RELATION') return { key: field.name, label };
@@ -167,29 +168,44 @@ async function objectOptions({
 async function fieldOptions({
   auth,
   objectId,
+  purpose,
 }: {
   auth: TwentyAuthValue;
   objectId: string;
+  purpose: FieldPurpose;
 }): Promise<SelectOption[]> {
   const fields = await twentyApi.getObjectFields({ auth, objectId });
   return fields
-    .filter(
-      (field) =>
-        field['isActive'] === true &&
-        !EXCLUDED_FIELD_TYPES.includes(field.type) &&
-        (field['isSystem'] !== true ||
-          ALLOWED_SYSTEM_FIELDS.includes(field.name)) &&
-        resolveFilterTarget({ field }) !== undefined
-    )
+    .filter((field) => isFieldUsable({ field, purpose }))
     .map((field) => ({
       label: typeof field['label'] === 'string' ? field['label'] : field.name,
       value: field.id,
     }));
 }
 
+function isFieldUsable({
+  field,
+  purpose,
+}: {
+  field: TwentyMetadataField;
+  purpose: FieldPurpose;
+}): boolean {
+  if (
+    field['isActive'] !== true ||
+    EXCLUDED_FIELD_TYPES.includes(field.type) ||
+    resolveFieldTarget({ field }) === undefined
+  )
+    return false;
+  if (purpose === 'write')
+    return field['isSystem'] !== true && field['writability'] !== 'SYSTEM';
+  return (
+    field['isSystem'] !== true || ALLOWED_SYSTEM_FIELDS.includes(field.name)
+  );
+}
+
 export const twentyMetadataUtils = {
   getCompositeSubfields,
-  resolveFilterTarget,
+  resolveFieldTarget,
   buildSelectOptions,
   isObjectRef,
   objectOptions,
@@ -204,6 +220,6 @@ export type CompositeSubfield = {
   placeholder?: string;
 };
 
-export type FilterTarget = { key: string; label: string };
+export type FieldTarget = { key: string; label: string };
 
 export type ObjectOption = { label: string; value: TwentyObjectRef };

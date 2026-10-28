@@ -13,6 +13,8 @@ import { twentyAiActions } from './lib/actions/ai';
 import { newPersonTrigger } from './lib/triggers/new-person';
 import { newCompanyTrigger } from './lib/triggers/new-company';
 import { findCustomObject } from './lib/actions/find-custom-object';
+import { updateCustomObject } from './lib/actions/update-custom-object';
+import { createCustomObject } from './lib/actions/create-custom-object';
 
 export { twentyAuth };
 
@@ -25,12 +27,14 @@ export const twenty = createPiece({
   categories: [PieceCategory.SALES_AND_CRM],
   authors: ['Akash5908'],
   actions: [
+    createCustomObject,
     createContactAction,
     createCompanyAction,
     createOpportunityAction,
     findCustomObject,
     findPersonAction,
     findCompanyAction,
+    updateCustomObject,
     updatePersonAction,
     updateCompanyAction,
     ...twentyAiActions,

@@ -75,6 +75,8 @@ export type SelectOption = { label: string; value: string };
 
 export type TwentyObjectRef = { id: string; namePlural: string };
 
+export type FieldPurpose = 'filter' | 'write';
+
 export type FilterOperator =
   | 'eq'
   | 'neq'
@@ -89,10 +91,11 @@ export type FilterOperator =
   | 'ilike'
   | 'containsAny';
 
-export type FilterValue = string | number | boolean | string[];
+export type FieldValue = string | number | boolean | string[];
 
-export type FilterCondition = {
+export type FieldEntry = {
   field: string;
-  operator: FilterOperator;
-  value: FilterValue | undefined;
+  value: FieldValue | undefined;
 };
+
+export type FilterCondition = FieldEntry & { operator: FilterOperator };
