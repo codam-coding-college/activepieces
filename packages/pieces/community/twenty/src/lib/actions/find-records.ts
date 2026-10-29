@@ -1,23 +1,23 @@
 import { createAction } from '@activepieces/pieces-framework';
 import { twentyAuth } from '../auth';
 import { twentyApi } from '../common/api';
-import { customObjectParamsUtils } from '../common/custom-object-params';
-import { twentyCustomObjectProps } from '../common/custom-object-props';
+import { recordParamsUtils } from '../common/record-params';
+import { twentyRecordProps } from '../common/record-props';
 import { twentyMetadataUtils } from '../common/metadata';
 
-export const findCustomObject = createAction({
+export const findRecords = createAction({
   auth: twentyAuth,
-  name: 'findCustomObject',
-  displayName: 'Find Custom Object',
-  description: 'Finds custom object records in Twenty CRM.',
+  name: 'findRecords',
+  displayName: 'Find Records',
+  description: 'Finds records of any object in Twenty CRM.',
   classification: 'SEARCH',
   propertyGroups: [
     {
       key: 'search',
       display: 'section',
-      label: 'Custom Object',
+      label: 'Object',
       icon: 'tag',
-      props: ['customObject'],
+      props: ['object'],
     },
     {
       key: 'filters',
@@ -28,27 +28,27 @@ export const findCustomObject = createAction({
     },
   ],
   props: {
-    customObject: twentyCustomObjectProps.object({
+    object: twentyRecordProps.object({
       required: true,
       description:
         'The type of record to search, e.g. People, Companies or one of your custom objects.',
     }),
-    fields: twentyCustomObjectProps.fields({
+    fields: twentyRecordProps.fields({
       required: true,
       displayName: 'Filter By',
       description: 'The fields to filter on.',
     }),
-    filters: twentyCustomObjectProps.filters({ required: false }),
+    filters: twentyRecordProps.filters({ required: false }),
   },
   async run(context) {
-    const { customObject, filters } = context.propsValue;
-    if (!twentyMetadataUtils.isObjectRef(customObject))
-      throw new Error('Select a custom object type.');
+    const { object, filters } = context.propsValue;
+    if (!twentyMetadataUtils.isObjectRef(object))
+      throw new Error('Select an object.');
 
     return await twentyApi.findCustomObject({
       auth: context.auth,
-      objectNamePlural: customObject.namePlural,
-      conditions: customObjectParamsUtils.toFilterConditions({
+      objectNamePlural: object.namePlural,
+      conditions: recordParamsUtils.toFilterConditions({
         conditions: filters ?? {},
       }),
     });

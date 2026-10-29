@@ -195,7 +195,7 @@ function isFieldValue(value: unknown): value is FieldValue {
   );
 }
 
-export const customObjectParamsUtils = {
+export const recordParamsUtils = {
   fieldKeyFormat,
   groupConditions,
   toFilterConditions,

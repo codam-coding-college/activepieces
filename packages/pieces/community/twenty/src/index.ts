@@ -12,9 +12,9 @@ import { updateCompanyAction } from './lib/actions/update-company';
 import { twentyAiActions } from './lib/actions/ai';
 import { newPersonTrigger } from './lib/triggers/new-person';
 import { newCompanyTrigger } from './lib/triggers/new-company';
-import { findCustomObject } from './lib/actions/find-custom-object';
-import { updateCustomObject } from './lib/actions/update-custom-object';
-import { createCustomObject } from './lib/actions/create-custom-object';
+import { findRecords } from './lib/actions/find-records';
+import { updateRecord } from './lib/actions/update-record';
+import { createRecord } from './lib/actions/create-record';
 
 export { twentyAuth };
 
@@ -27,14 +27,14 @@ export const twenty = createPiece({
   categories: [PieceCategory.SALES_AND_CRM],
   authors: ['Akash5908'],
   actions: [
-    createCustomObject,
+    createRecord,
     createContactAction,
     createCompanyAction,
     createOpportunityAction,
-    findCustomObject,
+    findRecords,
     findPersonAction,
     findCompanyAction,
-    updateCustomObject,
+    updateRecord,
     updatePersonAction,
     updateCompanyAction,
     ...twentyAiActions,

@@ -7,7 +7,7 @@ import {
 import { twentyAuth } from '../auth';
 import { PropParams } from './ai-props';
 import { twentyApi } from './api';
-import { customObjectParamsUtils } from './custom-object-params';
+import { recordParamsUtils } from './record-params';
 import { twentyMetadataUtils } from './metadata';
 import {
   FieldPurpose,
@@ -17,7 +17,7 @@ import {
   TwentyMetadataField,
 } from './types';
 
-const KEY = customObjectParamsUtils.fieldKeyFormat;
+const KEY = recordParamsUtils.fieldKeyFormat;
 
 const TEXT_OPERATORS: FilterOperator[] = [
   'eq',
@@ -117,7 +117,7 @@ const DATE_PRESETS: DatePresetOption[] = [
 function recordId<R extends boolean>({
   required,
   displayName = 'Record ID',
-  description = 'The ID of the record, e.g. mapped from Find Custom Object.',
+  description = 'The ID of the record, e.g. mapped from Find Records.',
 }: PropParams<R>) {
   return Property.ShortText({
     required,
@@ -128,7 +128,7 @@ function recordId<R extends boolean>({
 
 function object<R extends boolean>({
   required,
-  displayName = 'Custom Object Type',
+  displayName = 'Object',
   description = 'The type of record, e.g. People, Companies or one of your custom objects.',
 }: PropParams<R>) {
   return Property.Dropdown({
@@ -154,7 +154,7 @@ function fields<R extends boolean>({
   required,
   displayName = 'Fields',
   description = 'The fields to use.',
-  objectProp = 'customObject',
+  objectProp = 'object',
   purpose = 'filter',
 }: FieldsPropParams<R>) {
   return Property.MultiSelectDropdown({
@@ -164,8 +164,8 @@ function fields<R extends boolean>({
     required,
     refreshers: [objectProp],
     options: async (propsValue) => {
-      const customObject = propsValue[objectProp];
-      if (!propsValue.auth || !twentyMetadataUtils.isObjectRef(customObject))
+      const object = propsValue[objectProp];
+      if (!propsValue.auth || !twentyMetadataUtils.isObjectRef(object))
         return {
           disabled: true,
           options: [],
@@ -175,7 +175,7 @@ function fields<R extends boolean>({
       return {
         options: await twentyMetadataUtils.fieldOptions({
           auth: propsValue.auth,
-          objectId: customObject.id,
+          objectId: object.id,
           purpose,
         }),
       };
@@ -187,7 +187,7 @@ function filters<R extends boolean>({
   required,
   displayName = 'Filters',
   description = 'Set how each field is compared. Records must match every filter.',
-  objectProp = 'customObject',
+  objectProp = 'object',
   fieldsProp = 'fields',
 }: FieldInputsPropParams<R>) {
   return fieldInputs({
@@ -204,7 +204,7 @@ function values<R extends boolean>({
   required,
   displayName = 'Values',
   description = 'The values to set for each field.',
-  objectProp = 'customObject',
+  objectProp = 'object',
   fieldsProp = 'fields',
 }: FieldInputsPropParams<R>) {
   return fieldInputs({
@@ -453,7 +453,7 @@ function buildDateProps({
   ];
 }
 
-export const twentyCustomObjectProps = {
+export const twentyRecordProps = {
   recordId,
   object,
   fields,
