@@ -80,6 +80,11 @@ const TEXT_VALUE_DESCRIPTIONS: Record<FieldPurpose, string> = {
   write: 'The value to set.',
 };
 
+const HEADING_PREFIXES: Record<FieldPurpose, string> = {
+  filter: 'Where',
+  write: 'Set',
+};
+
 const VALUE_DESCRIPTIONS: Record<FieldPurpose, Record<string, string>> = {
   filter: {
     RELATION: 'The ID of the related record.',
@@ -126,6 +131,19 @@ function recordId<R extends boolean>({
   });
 }
 
+function rewrite<R extends boolean>({
+  required,
+  displayName = 'Rewrite array fields',
+  description = 'Replace list fields instead of adding the new values to them.',
+}: PropParams<R>) {
+  return Property.Checkbox({
+    required,
+    displayName,
+    description,
+    defaultValue: false,
+  });
+}
+
 function object<R extends boolean>({
   required,
   displayName = 'Object',
@@ -163,9 +181,8 @@ function fields<R extends boolean>({
     description,
     required,
     refreshers: [objectProp],
-    options: async (propsValue) => {
-      const object = propsValue[objectProp];
-      if (!propsValue.auth || !twentyMetadataUtils.isObjectRef(object))
+    options: async ({ auth, [objectProp]: object }) => {
+      if (!auth || !twentyMetadataUtils.isObjectRef(object))
         return {
           disabled: true,
           options: [],
@@ -174,7 +191,7 @@ function fields<R extends boolean>({
 
       return {
         options: await twentyMetadataUtils.fieldOptions({
-          auth: propsValue.auth,
+          auth: auth,
           objectId: object.id,
           purpose,
         }),
@@ -238,12 +255,11 @@ function fieldInputs<R extends boolean>({
     description,
     required,
     refreshers: [fieldsProp, objectProp],
-    props: async (propsValue) => {
-      const fieldIds = propsValue[fieldsProp];
-      if (!propsValue.auth || !Array.isArray(fieldIds)) return {};
+    props: async ({ auth, [fieldsProp]: fieldIds }) => {
+      if (!auth || !Array.isArray(fieldIds)) return {};
 
       return await buildFieldInputs({
-        auth: propsValue.auth,
+        auth: auth,
         fieldIds,
         purpose,
       });
@@ -291,21 +307,18 @@ async function buildFieldProps({
           [
             `${target.key}${KEY.delimiter}${KEY.operator}`,
             Property.StaticDropdown({
-              displayName: `${target.label} operator`,
+              displayName: 'Condition',
               description: 'How the value below is compared.',
               required: true,
               options: { options: operatorOptions },
             }),
           ],
         ];
-  const heading =
-    purpose === 'filter' ? `${target.label} Filters` : target.label;
-
   return [
     [
       `${target.key}${KEY.delimiter}${KEY.header}`,
       Property.MarkDown({
-        value: `---\n\n### ${heading}`,
+        value: `---\n\n### ${HEADING_PREFIXES[purpose]} ${target.label}`,
         variant: MarkdownVariant.BORDERLESS,
       }),
     ],
@@ -455,6 +468,7 @@ function buildDateProps({
 
 export const twentyRecordProps = {
   recordId,
+  rewrite,
   object,
   fields,
   filters,

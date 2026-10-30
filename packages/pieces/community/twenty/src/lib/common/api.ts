@@ -178,7 +178,7 @@ async function findPeople({
   });
 }
 
-async function findCustomObject({
+async function findRecords({
   auth,
   objectNamePlural,
   conditions,
@@ -192,41 +192,6 @@ async function findCustomObject({
     path: recordsPath({ objectNamePlural }),
     query: filterQuery({ conditions }),
   });
-}
-
-async function createCustomObject({
-  auth,
-  objectNamePlural,
-  record,
-}: {
-  auth: TwentyAuthValue;
-  objectNamePlural: string;
-  record: Record<string, unknown>;
-}): Promise<TwentyRecord | undefined> {
-  return await createRecord({ auth, objectNamePlural, record });
-}
-
-async function updateCustomObject({
-  auth,
-  objectNamePlural,
-  recordId,
-  record,
-  replaceArrays,
-}: RecordParams & {
-  auth: TwentyAuthValue;
-  record: Record<string, unknown>;
-  replaceArrays: boolean;
-}): Promise<TwentyRecord | undefined> {
-  if (Object.keys(record).length === 0)
-    return await getRecord({ auth, objectNamePlural, recordId });
-
-  const body = replaceArrays
-    ? record
-    : appendArrayFields({
-        record,
-        existing: await getRecord({ auth, objectNamePlural, recordId }),
-      });
-  return await updateRecord({ auth, objectNamePlural, recordId, record: body });
 }
 
 async function listRecentCompanies({
@@ -423,17 +388,46 @@ async function updateRecord({
   objectNamePlural,
   recordId,
   record,
+  appendArrays,
 }: RecordParams & {
   auth: TwentyAuthValue;
   record: Record<string, unknown>;
+  appendArrays?: boolean;
 }): Promise<TwentyRecord | undefined> {
+  const body = appendArrays
+    ? appendArrayFields({
+        record,
+        existing: await getRecord({ auth, objectNamePlural, recordId }),
+      })
+    : record;
   const response = await twentyClient.request<TwentyEnvelope<TwentyRecord>>({
     auth,
     method: HttpMethod.PATCH,
     path: recordsPath({ objectNamePlural, recordId }),
-    body: record,
+    body,
   });
   return firstValue({ envelope: response });
+}
+
+async function updateRecords({
+  auth,
+  objectNamePlural,
+  conditions,
+  record,
+}: {
+  auth: TwentyAuthValue;
+  objectNamePlural: string;
+  conditions: FilterCondition[];
+  record: Record<string, unknown>;
+}): Promise<TwentyRecord[]> {
+  const response = await twentyClient.request<TwentyEnvelope<TwentyRecord[]>>({
+    auth,
+    method: HttpMethod.PATCH,
+    path: recordsPath({ objectNamePlural }),
+    query: filterQuery({ conditions }),
+    body: record,
+  });
+  return firstValue({ envelope: response }) ?? [];
 }
 
 async function deleteRecord({
@@ -820,9 +814,7 @@ export const twentyApi = {
   createOpportunity,
   findCompanies,
   findPeople,
-  findCustomObject,
-  createCustomObject,
-  updateCustomObject,
+  findRecords,
   listRecentCompanies,
   listRecentPeople,
   updateCompany,
@@ -832,6 +824,7 @@ export const twentyApi = {
   createRecord,
   createRecords,
   updateRecord,
+  updateRecords,
   deleteRecord,
   restoreRecord,
   findDuplicateRecords,

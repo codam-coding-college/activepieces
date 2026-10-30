@@ -24,7 +24,7 @@ export const createRecord = createAction({
       display: 'section',
       label: 'Field',
       icon: 'tag',
-      props: ['fields'],
+      props: ['fields', 'values'],
     },
   ],
   props: {
@@ -45,7 +45,7 @@ export const createRecord = createAction({
     if (!twentyMetadataUtils.isObjectRef(object))
       throw new Error('Select an object.');
 
-    return await twentyApi.createCustomObject({
+    return await twentyApi.createRecord({
       auth: context.auth,
       objectNamePlural: object.namePlural,
       record: recordParamsUtils.toRecordValues({ values: values ?? {} }),

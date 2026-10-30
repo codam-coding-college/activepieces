@@ -24,7 +24,7 @@ export const findRecords = createAction({
       display: 'section',
       label: 'Filter Fields',
       icon: 'filter',
-      props: ['fields'],
+      props: ['fields', 'filters'],
     },
   ],
   props: {
@@ -45,7 +45,7 @@ export const findRecords = createAction({
     if (!twentyMetadataUtils.isObjectRef(object))
       throw new Error('Select an object.');
 
-    return await twentyApi.findCustomObject({
+    return await twentyApi.findRecords({
       auth: context.auth,
       objectNamePlural: object.namePlural,
       conditions: recordParamsUtils.toFilterConditions({

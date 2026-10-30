@@ -15,6 +15,7 @@ import { newCompanyTrigger } from './lib/triggers/new-company';
 import { findRecords } from './lib/actions/find-records';
 import { updateRecord } from './lib/actions/update-record';
 import { createRecord } from './lib/actions/create-record';
+import { createOrUpdateRecord } from './lib/actions/create-or-update-record';
 
 export { twentyAuth };
 
@@ -31,6 +32,7 @@ export const twenty = createPiece({
     createContactAction,
     createCompanyAction,
     createOpportunityAction,
+    createOrUpdateRecord,
     findRecords,
     findPersonAction,
     findCompanyAction,

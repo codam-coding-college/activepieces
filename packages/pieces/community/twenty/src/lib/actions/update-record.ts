@@ -1,8 +1,8 @@
-import { createAction, Property } from '@activepieces/pieces-framework';
+import { createAction } from '@activepieces/pieces-framework';
 import { twentyAuth } from '../auth';
-import { twentyApi } from '../common/api';
 import { recordParamsUtils } from '../common/record-params';
 import { twentyRecordProps } from '../common/record-props';
+import { twentyApi } from '../common/api';
 import { twentyMetadataUtils } from '../common/metadata';
 
 export const updateRecord = createAction({
@@ -24,7 +24,7 @@ export const updateRecord = createAction({
       display: 'section',
       label: 'Field',
       icon: 'tag',
-      props: ['fields'],
+      props: ['fields', 'values'],
     },
     {
       key: 'settings',
@@ -37,13 +37,7 @@ export const updateRecord = createAction({
   props: {
     object: twentyRecordProps.object({ required: true }),
     recordId: twentyRecordProps.recordId({ required: true }),
-    rewrite: Property.Checkbox({
-      required: false,
-      displayName: 'Rewrite array fields',
-      description:
-        'Replace list fields instead of adding the new values to them.',
-      defaultValue: false,
-    }),
+    rewrite: twentyRecordProps.rewrite({ required: false }),
     fields: twentyRecordProps.fields({
       displayName: 'Selected Fields',
       description: 'The fields to change on the record.',
@@ -60,12 +54,20 @@ export const updateRecord = createAction({
     if (!twentyMetadataUtils.isObjectRef(object))
       throw new Error('Select an object.');
 
-    return await twentyApi.updateCustomObject({
+    const record = recordParamsUtils.toRecordValues({ values: values ?? {} });
+    if (Object.keys(record).length === 0)
+      return await twentyApi.getRecord({
+        auth: context.auth,
+        objectNamePlural: object.namePlural,
+        recordId,
+      });
+
+    return await twentyApi.updateRecord({
       auth: context.auth,
       objectNamePlural: object.namePlural,
       recordId,
-      record: recordParamsUtils.toRecordValues({ values: values ?? {} }),
-      replaceArrays: rewrite ?? false,
+      record,
+      appendArrays: !rewrite,
     });
   },
 });
