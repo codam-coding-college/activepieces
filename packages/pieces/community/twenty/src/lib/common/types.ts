@@ -8,6 +8,7 @@ export type TwentyAuthValue = {
 export type TwentyRecord = {
   id?: string;
   createdAt?: string;
+  updatedAt?: string;
   [key: string]: unknown;
 };
 
@@ -73,7 +74,11 @@ export type TwentyMetadataSingle = TwentyMetadataItem & {
 
 export type SelectOption = { label: string; value: string };
 
-export type TwentyObjectRef = { id: string; namePlural: string };
+export type TwentyObjectRef = {
+  id: string;
+  namePlural: string;
+  nameSingular: string;
+};
 
 export type FieldPurpose = 'filter' | 'write';
 
@@ -99,3 +104,12 @@ export type FieldEntry = {
 };
 
 export type FilterCondition = FieldEntry & { operator: FilterOperator };
+
+export type FilterConjunction = 'and' | 'or' | 'not';
+
+export type FilterGroup = {
+  conjunction: FilterConjunction;
+  conditions: FilterNode[];
+};
+
+export type FilterNode = FilterCondition | FilterGroup;

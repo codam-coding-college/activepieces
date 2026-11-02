@@ -30,6 +30,6 @@ export const updateRecordAction = createAction({
 	},
 	async run(context) {
 		const { objectNamePlural, recordId, record } = context.propsValue;
-		return await twentyApi.updateRecord({ auth: context.auth, objectNamePlural, recordId, record });
+		return await twentyApi.updateRecord({ auth: context.auth, objectNamePlural, recordId, recordValues: record });
 	},
 });

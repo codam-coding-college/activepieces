@@ -54,7 +54,7 @@ export const findDuplicateRecordsAction = createAction({
 			auth: context.auth,
 			objectNamePlural,
 			recordIds: ids.length > 0 ? ids : undefined,
-			records: candidates.length > 0 ? candidates : undefined,
+			recordValuesList: candidates.length > 0 ? candidates : undefined,
 		});
 	},
 });

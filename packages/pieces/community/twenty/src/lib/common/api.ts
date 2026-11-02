@@ -3,7 +3,8 @@ import { HttpMethod, QueryParams } from '@activepieces/pieces-common';
 import { twentyClient } from './client';
 
 import type {
-  FilterCondition,
+  FilterGroup,
+  FilterNode,
   FieldValue,
   TwentyAuthValue,
   TwentyDuplicateConnection,
@@ -185,7 +186,7 @@ async function findRecords({
 }: {
   auth: TwentyAuthValue;
   objectNamePlural: string;
-  conditions: FilterCondition[];
+  conditions: FilterNode[];
 }): Promise<TwentyRecord[]> {
   return await listRecordItems({
     auth,
@@ -343,12 +344,12 @@ async function getRecord({
 async function createRecord({
   auth,
   objectNamePlural,
-  record,
+  recordValues,
   upsert,
 }: {
   auth: TwentyAuthValue;
   objectNamePlural: string;
-  record: Record<string, unknown>;
+  recordValues: Record<string, unknown>;
   upsert?: boolean;
 }): Promise<TwentyRecord | undefined> {
   const response = await twentyClient.request<TwentyEnvelope<TwentyRecord>>({
@@ -356,7 +357,7 @@ async function createRecord({
     method: HttpMethod.POST,
     path: recordsPath({ objectNamePlural }),
     query: compactQuery({ values: { upsert: upsert ? true : undefined } }),
-    body: record,
+    body: recordValues,
   });
   return firstValue({ envelope: response });
 }
@@ -364,12 +365,12 @@ async function createRecord({
 async function createRecords({
   auth,
   objectNamePlural,
-  records,
+  recordValuesList,
   upsert,
 }: {
   auth: TwentyAuthValue;
   objectNamePlural: string;
-  records: Record<string, unknown>[];
+  recordValuesList: Record<string, unknown>[];
   upsert?: boolean;
 }): Promise<{ records: TwentyRecord[]; count: number }> {
   const response = await twentyClient.request<TwentyEnvelope<TwentyRecord[]>>({
@@ -377,7 +378,7 @@ async function createRecords({
     method: HttpMethod.POST,
     path: `/rest/batch/${encodeURIComponent(objectNamePlural)}`,
     query: compactQuery({ values: { upsert: upsert ? true : undefined } }),
-    body: records,
+    body: recordValuesList,
   });
   const created = firstValue({ envelope: response }) ?? [];
   return { records: created, count: created.length };
@@ -387,19 +388,19 @@ async function updateRecord({
   auth,
   objectNamePlural,
   recordId,
-  record,
+  recordValues,
   appendArrays,
 }: RecordParams & {
   auth: TwentyAuthValue;
-  record: Record<string, unknown>;
+  recordValues: Record<string, unknown>;
   appendArrays?: boolean;
 }): Promise<TwentyRecord | undefined> {
   const body = appendArrays
     ? appendArrayFields({
-        record,
+        recordValues,
         existing: await getRecord({ auth, objectNamePlural, recordId }),
       })
-    : record;
+    : recordValues;
   const response = await twentyClient.request<TwentyEnvelope<TwentyRecord>>({
     auth,
     method: HttpMethod.PATCH,
@@ -413,19 +414,19 @@ async function updateRecords({
   auth,
   objectNamePlural,
   conditions,
-  record,
+  recordValues,
 }: {
   auth: TwentyAuthValue;
   objectNamePlural: string;
-  conditions: FilterCondition[];
-  record: Record<string, unknown>;
+  conditions: FilterNode[];
+  recordValues: Record<string, unknown>;
 }): Promise<TwentyRecord[]> {
   const response = await twentyClient.request<TwentyEnvelope<TwentyRecord[]>>({
     auth,
     method: HttpMethod.PATCH,
     path: recordsPath({ objectNamePlural }),
     query: filterQuery({ conditions }),
-    body: record,
+    body: recordValues,
   });
   return firstValue({ envelope: response }) ?? [];
 }
@@ -468,12 +469,12 @@ async function findDuplicateRecords({
   auth,
   objectNamePlural,
   recordIds,
-  records,
+  recordValuesList,
 }: {
   auth: TwentyAuthValue;
   objectNamePlural: string;
   recordIds?: string[];
-  records?: Record<string, unknown>[];
+  recordValuesList?: Record<string, unknown>[];
 }): Promise<{
   results: {
     duplicates: TwentyRecord[];
@@ -487,7 +488,7 @@ async function findDuplicateRecords({
     auth,
     method: HttpMethod.POST,
     path: `${recordsPath({ objectNamePlural })}/duplicates`,
-    body: { ids: recordIds, data: records },
+    body: { ids: recordIds, data: recordValuesList },
   });
   return {
     results: response.data.map((connection) => {
@@ -729,18 +730,39 @@ function recordsPath({
 function filterQuery({
   conditions,
 }: {
-  conditions: FilterCondition[];
+  conditions: FilterNode[];
 }): QueryParams {
   const filter = conditions
-    .filter(({ value }) => !isEmptyFieldValue({ value }))
-    .map(
-      ({ field, operator, value }) =>
-        `${field}[${operator}]:${
-          operator === 'is' ? value : JSON.stringify(value)
-        }`
-    )
+    .flatMap((node) => pruneFilterNode({ node }))
+    .map((node) => renderFilterNode({ node }))
     .join(',');
   return filter ? { filter } : {};
+}
+
+function pruneFilterNode({ node }: { node: FilterNode }): FilterNode[] {
+  if (!isFilterGroup(node))
+    return isEmptyFieldValue({ value: node.value }) ? [] : [node];
+  const conditions = node.conditions.flatMap((child) =>
+    pruneFilterNode({ node: child })
+  );
+  if (conditions.length === 0) return [];
+  if (conditions.length === 1 && node.conjunction !== 'not') return conditions;
+  return [{ conjunction: node.conjunction, conditions }];
+}
+
+function renderFilterNode({ node }: { node: FilterNode }): string {
+  if (isFilterGroup(node))
+    return `${node.conjunction}(${node.conditions
+      .map((child) => renderFilterNode({ node: child }))
+      .join(',')})`;
+  const { field, operator, value } = node;
+  return `${field}[${operator}]:${
+    operator === 'is' ? value : JSON.stringify(value)
+  }`;
+}
+
+function isFilterGroup(node: FilterNode): node is FilterGroup {
+  return 'conjunction' in node;
 }
 
 function isEmptyFieldValue({
@@ -756,14 +778,14 @@ function isEmptyFieldValue({
 }
 
 function appendArrayFields({
-  record,
+  recordValues,
   existing,
 }: {
-  record: Record<string, unknown>;
+  recordValues: Record<string, unknown>;
   existing: TwentyRecord | undefined;
 }): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(record).map(([field, value]) => {
+    Object.entries(recordValues).map(([field, value]) => {
       const current = existing?.[field];
       return Array.isArray(value) && Array.isArray(current)
         ? [field, [...new Set([...current, ...value])]]

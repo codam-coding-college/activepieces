@@ -30,6 +30,6 @@ export const createRecordAction = createAction({
 	},
 	async run(context) {
 		const { objectNamePlural, record, upsert } = context.propsValue;
-		return await twentyApi.createRecord({ auth: context.auth, objectNamePlural, record, upsert });
+		return await twentyApi.createRecord({ auth: context.auth, objectNamePlural, recordValues: record, upsert });
 	},
 });

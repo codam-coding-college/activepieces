@@ -4,13 +4,20 @@ import { recordParamsUtils } from '../common/record-params';
 import { twentyRecordProps } from '../common/record-props';
 import { twentyApi } from '../common/api';
 import { twentyMetadataUtils } from '../common/metadata';
+import { twentyUpdateRecordOutputSchema } from '../output-schemas';
 
 export const updateRecord = createAction({
   auth: twentyAuth,
   name: 'updateRecord',
+  outputSchema: twentyUpdateRecordOutputSchema,
   displayName: 'Update Record',
   classification: 'WRITE',
   description: 'Updates a record of any object in Twenty CRM.',
+  aiMetadata: {
+    description:
+      'Updates one record of the selected object in Twenty CRM, identified by its record ID (resolve it first with Find Records). Changes only the chosen fields; list fields get the new values added unless Rewrite is on. If no values are given it returns the current record. Idempotent when Rewrite is on; with Rewrite off, list values are merged so repeating the call leaves the record unchanged.',
+    idempotent: true,
+  },
   propertyGroups: [
     {
       key: 'search',
@@ -54,8 +61,8 @@ export const updateRecord = createAction({
     if (!twentyMetadataUtils.isObjectRef(object))
       throw new Error('Select an object.');
 
-    const record = recordParamsUtils.toRecordValues({ values: values ?? {} });
-    if (Object.keys(record).length === 0)
+    const recordValues = recordParamsUtils.toRecordValues({ values: values ?? {} });
+    if (Object.keys(recordValues).length === 0)
       return await twentyApi.getRecord({
         auth: context.auth,
         objectNamePlural: object.namePlural,
@@ -66,7 +73,7 @@ export const updateRecord = createAction({
       auth: context.auth,
       objectNamePlural: object.namePlural,
       recordId,
-      record,
+      recordValues,
       appendArrays: !rewrite,
     });
   },

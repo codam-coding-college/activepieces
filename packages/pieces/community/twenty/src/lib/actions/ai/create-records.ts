@@ -46,7 +46,7 @@ export const createRecordsAction = createAction({
 		) {
 			throw new Error('Every item in Records must be a JSON object of field values.');
 		}
-		return await twentyApi.createRecords({ auth: context.auth, objectNamePlural, records, upsert });
+		return await twentyApi.createRecords({ auth: context.auth, objectNamePlural, recordValuesList: records, upsert });
 	},
 });
 

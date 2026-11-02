@@ -137,7 +137,9 @@ function isObjectRef(value: unknown): value is TwentyObjectRef {
     'id' in value &&
     typeof value.id === 'string' &&
     'namePlural' in value &&
-    typeof value.namePlural === 'string'
+    typeof value.namePlural === 'string' &&
+    'nameSingular' in value &&
+    typeof value.nameSingular === 'string'
   );
 }
 
@@ -149,17 +151,19 @@ async function objectOptions({
   const objects = await twentyApi.listAllObjects({ auth });
   return objects.flatMap((object) => {
     const namePlural = object['namePlural'];
+    const nameSingular = object['nameSingular'];
     if (
       object['isActive'] !== true ||
       object['isSystem'] !== false ||
-      typeof namePlural !== 'string'
+      typeof namePlural !== 'string' ||
+      typeof nameSingular !== 'string'
     )
       return [];
     const labelPlural = object['labelPlural'];
     return [
       {
         label: typeof labelPlural === 'string' ? labelPlural : namePlural,
-        value: { id: object.id, namePlural },
+        value: { id: object.id, namePlural, nameSingular },
       },
     ];
   });

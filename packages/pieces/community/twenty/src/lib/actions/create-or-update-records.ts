@@ -4,18 +4,21 @@ import { twentyApi } from '../common/api';
 import { twentyMetadataUtils } from '../common/metadata';
 import { recordParamsUtils } from '../common/record-params';
 import { twentyRecordProps } from '../common/record-props';
-import {
-  FilterCondition,
-  TwentyAuthValue,
-  TwentyRecord,
-} from '../common/types';
+import { FilterNode, TwentyAuthValue, TwentyRecord } from '../common/types';
+import { createOrUpdateRecordsOutputSchema } from '../output-schemas';
 
-export const createOrUpdateRecord = createAction({
+export const createOrUpdateRecords = createAction({
   auth: twentyAuth,
-  name: 'createOrUpdateRecord',
-  displayName: 'Create or Update Record',
+  name: 'createOrUpdateRecords',
+  outputSchema: createOrUpdateRecordsOutputSchema,
+  displayName: 'Create or Update Records',
   description:
     'Updates the records matching the filters, or creates a new record when none match.',
+  aiMetadata: {
+    description:
+      'Updates the records of the selected object in Twenty CRM that match the filters, or creates a new record with the given values when none match. With Update All off it fails when more than one record matches. Returns whether records were created or updated. Not idempotent: the created record only matches later calls if the filtered fields are among the values set, otherwise each call creates another record.',
+    idempotent: false,
+  },
   classification: 'WRITE',
   propertyGroups: [
     {
@@ -55,7 +58,7 @@ export const createOrUpdateRecord = createAction({
       required: false,
       displayName: 'Update all matching records',
       description:
-        'Update every record that matches. When unchecked, only the first match is updated.',
+        'Update every record that matches. When unchecked, the step fails if more than one record matches.',
       defaultValue: true,
     }),
     updateFields: twentyRecordProps.fields({
@@ -81,51 +84,57 @@ export const createOrUpdateRecord = createAction({
     if (conditions.length === 0)
       throw new Error('Set at least one filter to match records on.');
 
-    const record = recordParamsUtils.toRecordValues({ values: values ?? {} });
+    const recordValues = recordParamsUtils.toRecordValues({ values: values ?? {} });
     const params = {
       auth: context.auth,
       objectNamePlural: object.namePlural,
       conditions,
-      record,
+      recordValues,
     };
 
     const updated = updateAll
       ? await twentyApi.updateRecords(params)
-      : await updateFirstMatch(params);
+      : await updateSingleMatch(params);
     if (updated.length > 0) return { action: 'updated', records: updated };
 
     const created = await twentyApi.createRecord({
       auth: context.auth,
       objectNamePlural: object.namePlural,
-      record,
+      recordValues,
     });
     return { action: 'created', records: created ? [created] : [] };
   },
 });
 
-async function updateFirstMatch({
+async function updateSingleMatch({
   auth,
   objectNamePlural,
   conditions,
-  record,
+  recordValues,
 }: {
   auth: TwentyAuthValue;
   objectNamePlural: string;
-  conditions: FilterCondition[];
-  record: Record<string, unknown>;
+  conditions: FilterNode[];
+  recordValues: Record<string, unknown>;
 }): Promise<TwentyRecord[]> {
-  const [first] = await twentyApi.findRecords({
+  const found = await twentyApi.findRecords({
     auth,
     objectNamePlural,
     conditions,
   });
-  if (!first?.id) return [];
+  if (found.length > 1)
+    throw new Error(
+      `Found ${found.length} matching records. Narrow the filters or turn on "Update all matching records".`
+    );
+
+  const [match] = found;
+  if (!match?.id) return [];
 
   const updated = await twentyApi.updateRecord({
     auth,
     objectNamePlural,
-    recordId: first.id,
-    record,
+    recordId: match.id,
+    recordValues,
   });
   return updated ? [updated] : [];
 }

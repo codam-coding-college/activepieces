@@ -1,4 +1,9 @@
-import { FilterCondition, FilterOperator, FieldValue } from './types';
+import {
+  FilterCondition,
+  FilterNode,
+  FilterOperator,
+  FieldValue,
+} from './types';
 
 const fieldKeyFormat = {
   delimiter: '_',
@@ -11,6 +16,12 @@ const fieldKeyFormat = {
 } as const;
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+const EXTRA_VALUE_SUBFIELDS: Record<string, string> = {
+  primaryEmail: 'additionalEmails',
+  primaryLinkUrl: 'secondaryLinks',
+  primaryPhoneNumber: 'additionalPhones',
+};
 
 const LIST_OPERATORS: FilterOperator[] = ['in', 'containsAny'];
 
@@ -55,7 +66,7 @@ function toFilterConditions({
   conditions,
 }: {
   conditions: FlatConditions;
-}): FilterCondition[] {
+}): FilterNode[] {
   const grouped = groupConditions({
     conditions,
     delimiter: fieldKeyFormat.delimiter,
@@ -76,8 +87,17 @@ function toRecordValues({
   });
   return Object.fromEntries(
     Object.entries(grouped).flatMap(([field, operations]) => {
-      const value = buildRecordValue({ operations });
-      return value === undefined ? [] : [[field, value]];
+      const {
+        operator: _operator,
+        header: _header,
+        value,
+        ...subfields
+      } = operations;
+      if (!isEmptyValue(value)) return [[field, value]];
+      const filled = Object.entries(subfields).filter(
+        ([, subfieldValue]) => !isEmptyValue(subfieldValue)
+      );
+      return filled.length > 0 ? [[field, Object.fromEntries(filled)]] : [];
     })
   );
 }
@@ -88,20 +108,87 @@ function buildFieldConditions({
 }: {
   field: string;
   operations: ConditionOperations;
-}): FilterCondition[] {
+}): FilterNode[] {
   if (operations[fieldKeyFormat.preset] !== undefined)
     return toDateConditions({ field, operations });
   const { operator, header: _header, ...values } = operations;
-  return Object.entries(values).flatMap(
-    ([operation, value]): FilterCondition[] => {
-      const path =
-        operation === fieldKeyFormat.value ? field : `${field}.${operation}`;
-      if (!isFilterOperator(operator) || !isFieldValue(value)) return [];
-      return [
-        { field: path, operator, value: toListValue({ operator, value }) },
-      ];
-    }
+  return Object.entries(values).flatMap(([operation, value]): FilterNode[] => {
+    const path =
+      operation === fieldKeyFormat.value ? field : `${field}.${operation}`;
+    if (!isFilterOperator(operator) || !isFieldValue(value)) return [];
+    const condition: FilterCondition = {
+      field: path,
+      operator,
+      value: toListValue({ operator, value }),
+    };
+    const extraSubfield = EXTRA_VALUE_SUBFIELDS[operation];
+    return [
+      extraSubfield
+        ? withExtraValues({ condition, extraField: `${field}.${extraSubfield}` })
+        : condition,
+    ];
+  });
+}
+
+function withExtraValues({
+  condition,
+  extraField,
+}: {
+  condition: FilterCondition;
+  extraField: string;
+}): FilterNode {
+  const extras = extraValuePatterns({
+    operator: condition.operator,
+    value: condition.value,
+  }).map(
+    (pattern): FilterCondition => ({
+      field: extraField,
+      operator: 'like',
+      value: pattern,
+    })
   );
+  if (extras.length === 0) return condition;
+  if (condition.operator !== 'neq')
+    return { conjunction: 'or', conditions: [condition, ...extras] };
+  return {
+    conjunction: 'and',
+    conditions: [
+      condition,
+      {
+        conjunction: 'or',
+        conditions: [
+          { conjunction: 'not', conditions: extras },
+          { field: extraField, operator: 'is', value: 'NULL' },
+        ],
+      },
+    ],
+  };
+}
+
+function extraValuePatterns({
+  operator,
+  value,
+}: {
+  operator: FilterOperator;
+  value: FieldValue | undefined;
+}): string[] {
+  const items = Array.isArray(value) ? value : [value];
+  return items.flatMap((item) => {
+    if (typeof item !== 'string' || item === '') return [];
+    switch (operator) {
+      case 'eq':
+      case 'neq':
+      case 'in':
+        return [`%"${item}"%`];
+      case 'startsWith':
+        return [`%"${item}%`];
+      case 'like':
+      case 'ilike':
+        return [item.includes('%') ? item : `%"${item}"%`];
+      default:
+        return [];
+    }
+  });
 }
 
 function toDateConditions({
@@ -138,24 +225,6 @@ function toDateConditions({
 
 function toOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
-}
-
-function buildRecordValue({
-  operations,
-}: {
-  operations: ConditionOperations;
-}): unknown {
-  const {
-    operator: _operator,
-    header: _header,
-    value,
-    ...subfields
-  } = operations;
-  if (!isEmptyValue(value)) return value;
-  const filled = Object.entries(subfields).filter(
-    ([, subfieldValue]) => !isEmptyValue(subfieldValue)
-  );
-  return filled.length > 0 ? Object.fromEntries(filled) : undefined;
 }
 
 function toListValue({
@@ -197,7 +266,6 @@ function isFieldValue(value: unknown): value is FieldValue {
 
 export const recordParamsUtils = {
   fieldKeyFormat,
-  groupConditions,
   toFilterConditions,
   toRecordValues,
 };

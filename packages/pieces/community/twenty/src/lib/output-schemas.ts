@@ -292,3 +292,20 @@ export const twentyListFieldsOutputSchema: OutputSchema = {
 		totalCountField,
 	],
 };
+
+export const findRecordsOutputSchema: OutputSchema = {
+	fields: [{ key: 'records', label: 'Records', value: '', labelKey: 'id', listItems: recordFields }],
+};
+
+export const createOrUpdateRecordsOutputSchema: OutputSchema = {
+	fields: [
+		{
+			key: 'action',
+			label: 'Action',
+			description: 'created when no record matched, updated when matching records were changed.',
+		},
+		{ key: 'records', label: 'Records', labelKey: 'id', listItems: recordFields },
+	],
+};
+
+export const recordUpdatedOutputSchema: OutputSchema = { fields: recordFields };
