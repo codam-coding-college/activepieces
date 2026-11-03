@@ -4,12 +4,10 @@ import { twentyApi } from '../common/api';
 import { recordParamsUtils } from '../common/record-params';
 import { twentyRecordProps } from '../common/record-props';
 import { twentyMetadataUtils } from '../common/metadata';
-import { twentyCreateRecordOutputSchema } from '../output-schemas';
 
 export const createRecord = createAction({
   auth: twentyAuth,
   name: 'createRecord',
-  outputSchema: twentyCreateRecordOutputSchema,
   displayName: 'Create Record',
   classification: 'WRITE',
   description: 'Creates a record of any object in Twenty CRM.',

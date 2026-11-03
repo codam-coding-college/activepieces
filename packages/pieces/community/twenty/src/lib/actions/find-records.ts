@@ -4,12 +4,10 @@ import { twentyApi } from '../common/api';
 import { recordParamsUtils } from '../common/record-params';
 import { twentyRecordProps } from '../common/record-props';
 import { twentyMetadataUtils } from '../common/metadata';
-import { findRecordsOutputSchema } from '../output-schemas';
 
 export const findRecords = createAction({
   auth: twentyAuth,
   name: 'findRecords',
-  outputSchema: findRecordsOutputSchema,
   displayName: 'Find Records',
   description: 'Finds records of any object in Twenty CRM.',
   aiMetadata: {

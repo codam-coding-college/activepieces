@@ -14,7 +14,6 @@ import { twentyAuth } from '../auth';
 import { twentyRecordProps } from '../common/record-props';
 import { twentyApi } from '../common/api';
 import { twentyMetadataUtils } from '../common/metadata';
-import { newRecordOutputSchema } from '../output-schemas';
 
 const props = { object: twentyRecordProps.object({ required: true }) };
 const polling: Polling<
@@ -46,7 +45,6 @@ const polling: Polling<
 export const newRecordTrigger = createTrigger({
   auth: twentyAuth,
   name: 'new_record',
-  outputSchema: newRecordOutputSchema,
   displayName: 'New Record',
   classification: 'READ',
   description:

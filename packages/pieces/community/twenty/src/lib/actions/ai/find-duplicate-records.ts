@@ -3,12 +3,10 @@ import { createAction, Property } from '@activepieces/pieces-framework';
 import { twentyAuth } from '../../auth';
 import { twentyAiProps } from '../../common/ai-props';
 import { twentyApi } from '../../common/api';
-import { twentyFindDuplicateRecordsOutputSchema } from '../../output-schemas';
 
 export const findDuplicateRecordsAction = createAction({
 	auth: twentyAuth,
 	name: 'twenty_find_duplicate_records',
-	outputSchema: twentyFindDuplicateRecordsOutputSchema,
 	displayName: 'Find Duplicate Records',
 	description: 'Finds likely duplicates of existing records or of candidate record data.',
 	audience: 'ai',

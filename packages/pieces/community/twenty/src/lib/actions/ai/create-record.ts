@@ -3,12 +3,10 @@ import { createAction, Property } from '@activepieces/pieces-framework';
 import { twentyAuth } from '../../auth';
 import { twentyAiProps } from '../../common/ai-props';
 import { twentyApi } from '../../common/api';
-import { twentyCreateRecordOutputSchema } from '../../output-schemas';
 
 export const createRecordAction = createAction({
 	auth: twentyAuth,
 	name: 'twenty_create_record',
-	outputSchema: twentyCreateRecordOutputSchema,
 	displayName: 'Create Record',
 	description: 'Creates one record of any object.',
 	audience: 'ai',

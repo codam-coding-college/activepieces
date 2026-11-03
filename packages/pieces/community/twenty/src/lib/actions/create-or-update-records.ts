@@ -5,12 +5,10 @@ import { twentyMetadataUtils } from '../common/metadata';
 import { recordParamsUtils } from '../common/record-params';
 import { twentyRecordProps } from '../common/record-props';
 import { FilterNode, TwentyAuthValue, TwentyRecord } from '../common/types';
-import { createOrUpdateRecordsOutputSchema } from '../output-schemas';
 
 export const createOrUpdateRecords = createAction({
   auth: twentyAuth,
   name: 'createOrUpdateRecords',
-  outputSchema: createOrUpdateRecordsOutputSchema,
   displayName: 'Create or Update Records',
   description:
     'Updates the records matching the filters, or creates a new record when none match.',

@@ -25,15 +25,6 @@ const recordSystemFields: OutputSchema['fields'] = [
 	{ key: 'deletedAt', label: 'Deleted At', format: 'datetime' },
 ];
 
-const recordFields: OutputSchema['fields'] = [
-	{
-		key: 'id',
-		label: 'Record ID',
-		description: "The record's own fields follow, named as in Get Object.",
-	},
-	...recordSystemFields,
-];
-
 const companyFields: OutputSchema['fields'] = [
 	{ key: 'id', label: 'Company ID' },
 	{ key: 'name', label: 'Name' },
@@ -218,48 +209,8 @@ export const createOpportunityOutputSchema: OutputSchema = {
 	],
 };
 
-export const twentyGetRecordOutputSchema: OutputSchema = { fields: recordFields };
-
-export const twentyCreateRecordOutputSchema: OutputSchema = { fields: recordFields };
-
-export const twentyUpdateRecordOutputSchema: OutputSchema = { fields: recordFields };
-
-export const twentyRestoreRecordOutputSchema: OutputSchema = { fields: recordFields };
-
-export const twentyMergeRecordsOutputSchema: OutputSchema = { fields: recordFields };
-
 export const twentyDeleteRecordOutputSchema: OutputSchema = {
 	fields: [{ key: 'id', label: 'Deleted Record ID' }],
-};
-
-export const twentyListRecordsOutputSchema: OutputSchema = {
-	fields: [
-		{ key: 'records', label: 'Records', labelKey: 'id', listItems: recordFields },
-		pageInfoField,
-		totalCountField,
-	],
-};
-
-export const twentyCreateRecordsOutputSchema: OutputSchema = {
-	fields: [
-		{ key: 'records', label: 'Created Records', labelKey: 'id', listItems: recordFields },
-		{ key: 'count', label: 'Count', format: 'number' },
-	],
-};
-
-export const twentyFindDuplicateRecordsOutputSchema: OutputSchema = {
-	fields: [
-		{
-			key: 'results',
-			label: 'Results',
-			description: 'One result per input record, in input order.',
-			listItems: [
-				{ key: 'duplicates', label: 'Duplicates', labelKey: 'id', listItems: recordFields },
-				totalCountField,
-				pageInfoField,
-			],
-		},
-	],
 };
 
 export const twentyGroupRecordsOutputSchema: OutputSchema = {
@@ -292,24 +243,3 @@ export const twentyListFieldsOutputSchema: OutputSchema = {
 		totalCountField,
 	],
 };
-
-export const findRecordsOutputSchema: OutputSchema = {
-	fields: [{ key: 'records', label: 'Records', value: '', labelKey: 'id', listItems: recordFields }],
-};
-
-export const createOrUpdateRecordsOutputSchema: OutputSchema = {
-	fields: [
-		{
-			key: 'action',
-			label: 'Action',
-			description: 'created when no record matched, updated when matching records were changed.',
-		},
-		{ key: 'records', label: 'Records', labelKey: 'id', listItems: recordFields },
-	],
-};
-
-export const newRecordOutputSchema: OutputSchema = { fields: recordFields };
-
-export const updatedRecordOutputSchema: OutputSchema = { fields: recordFields };
-
-export const deletedRecordOutputSchema: OutputSchema = { fields: recordFields };

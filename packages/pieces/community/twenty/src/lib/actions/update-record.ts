@@ -4,12 +4,10 @@ import { recordParamsUtils } from '../common/record-params';
 import { twentyRecordProps } from '../common/record-props';
 import { twentyApi } from '../common/api';
 import { twentyMetadataUtils } from '../common/metadata';
-import { twentyUpdateRecordOutputSchema } from '../output-schemas';
 
 export const updateRecord = createAction({
   auth: twentyAuth,
   name: 'updateRecord',
-  outputSchema: twentyUpdateRecordOutputSchema,
   displayName: 'Update Record',
   classification: 'WRITE',
   description: 'Updates a record of any object in Twenty CRM.',
