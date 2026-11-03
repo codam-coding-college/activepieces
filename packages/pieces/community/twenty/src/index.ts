@@ -16,7 +16,9 @@ import { findRecords } from './lib/actions/find-records';
 import { updateRecord } from './lib/actions/update-record';
 import { createRecord } from './lib/actions/create-record';
 import { createOrUpdateRecords } from './lib/actions/create-or-update-records';
-import { recordUpdatedTrigger } from './lib/triggers/record-updated';
+import { newRecordTrigger } from './lib/triggers/new-record';
+import { updatedRecordTrigger } from './lib/triggers/updated-record';
+import { deletedRecordTrigger } from './lib/triggers/deleted-record';
 
 export { twentyAuth };
 
@@ -49,5 +51,11 @@ export const twenty = createPiece({
       }),
     }),
   ],
-  triggers: [newPersonTrigger, newCompanyTrigger, recordUpdatedTrigger],
+  triggers: [
+    newPersonTrigger,
+    newCompanyTrigger,
+    newRecordTrigger,
+    updatedRecordTrigger,
+    deletedRecordTrigger,
+  ],
 });

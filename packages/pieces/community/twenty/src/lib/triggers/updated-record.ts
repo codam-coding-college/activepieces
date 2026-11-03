@@ -14,7 +14,7 @@ import { twentyAuth } from '../auth';
 import { twentyRecordProps } from '../common/record-props';
 import { twentyApi } from '../common/api';
 import { twentyMetadataUtils } from '../common/metadata';
-import { recordUpdatedOutputSchema } from '../output-schemas';
+import { updatedRecordOutputSchema } from '../output-schemas';
 
 const props = { object: twentyRecordProps.object({ required: true }) };
 const polling: Polling<
@@ -43,11 +43,11 @@ const polling: Polling<
   },
 };
 
-export const recordUpdatedTrigger = createTrigger({
+export const updatedRecordTrigger = createTrigger({
   auth: twentyAuth,
-  name: 'recordUpdated',
-  outputSchema: recordUpdatedOutputSchema,
-  displayName: 'Record Updated',
+  name: 'updated_record',
+  outputSchema: updatedRecordOutputSchema,
+  displayName: 'Updated Record',
   classification: 'READ',
   description:
     'Triggers when a record of the selected object is created or updated in Twenty CRM.',

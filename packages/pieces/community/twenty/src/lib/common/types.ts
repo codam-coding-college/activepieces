@@ -9,6 +9,7 @@ export type TwentyRecord = {
   id?: string;
   createdAt?: string;
   updatedAt?: string;
+  deletedAt?: string;
   [key: string]: unknown;
 };
 

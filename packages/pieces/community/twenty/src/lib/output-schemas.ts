@@ -308,4 +308,8 @@ export const createOrUpdateRecordsOutputSchema: OutputSchema = {
 	],
 };
 
-export const recordUpdatedOutputSchema: OutputSchema = { fields: recordFields };
+export const newRecordOutputSchema: OutputSchema = { fields: recordFields };
+
+export const updatedRecordOutputSchema: OutputSchema = { fields: recordFields };
+
+export const deletedRecordOutputSchema: OutputSchema = { fields: recordFields };
