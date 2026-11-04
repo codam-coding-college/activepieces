@@ -1,6 +1,5 @@
 import {
   InputProperty,
-  InputPropertyMap,
   MarkdownVariant,
   Property,
 } from '@activepieces/pieces-framework';
@@ -11,7 +10,7 @@ import { recordParamsUtils } from './record-params';
 import { twentyMetadataUtils } from './metadata';
 import {
   FieldPurpose,
-  FilterOperator,
+  QueryOperator,
   SelectOption,
   TwentyAuthValue,
   TwentyMetadataField,
@@ -19,7 +18,7 @@ import {
 
 const KEY = recordParamsUtils.fieldKeyFormat;
 
-const TEXT_OPERATORS: FilterOperator[] = [
+const TEXT_OPERATORS: QueryOperator[] = [
   'eq',
   'neq',
   'ilike',
@@ -28,7 +27,7 @@ const TEXT_OPERATORS: FilterOperator[] = [
   'in',
 ];
 
-const NUMBER_OPERATORS: FilterOperator[] = [
+const NUMBER_OPERATORS: QueryOperator[] = [
   'eq',
   'neq',
   'gt',
@@ -37,9 +36,9 @@ const NUMBER_OPERATORS: FilterOperator[] = [
   'lte',
 ];
 
-const CHOICE_OPERATORS: FilterOperator[] = ['eq', 'neq', 'in'];
+const CHOICE_OPERATORS: QueryOperator[] = ['eq', 'neq', 'in'];
 
-const OPERATORS_BY_TYPE: Record<string, FilterOperator[]> = {
+const OPERATORS_BY_TYPE: Record<string, QueryOperator[]> = {
   NUMBER: NUMBER_OPERATORS,
   NUMERIC: NUMBER_OPERATORS,
   BOOLEAN: ['eq'],
@@ -54,7 +53,7 @@ const OPERATORS_BY_TYPE: Record<string, FilterOperator[]> = {
   DATE: [],
 };
 
-const OPERATORS: Record<FilterOperator, OperatorDefinition> = {
+const OPERATORS: Record<QueryOperator, OperatorDefinition> = {
   eq: { label: 'equals', description: 'Exact match.' },
   neq: { label: 'does not equal', description: 'Anything but this.' },
   in: { label: 'is any of', description: 'Comma-separated, e.g. A, B.' },
@@ -258,31 +257,17 @@ function fieldInputs<R extends boolean>({
     props: async ({ auth, [fieldsProp]: fieldIds }) => {
       if (!auth || !Array.isArray(fieldIds)) return {};
 
-      return await buildFieldInputs({
-        auth: auth,
-        fieldIds,
-        purpose,
-      });
+      const validFieldIds = fieldIds.filter(
+        (id): id is string => typeof id === 'string'
+      );
+      const fieldProps = await Promise.all(
+        validFieldIds.map((id) =>
+          buildFieldProps({ auth, fieldId: id, purpose })
+        )
+      );
+      return Object.fromEntries(fieldProps.flat());
     },
   });
-}
-
-async function buildFieldInputs({
-  auth,
-  fieldIds,
-  purpose,
-}: {
-  auth: TwentyAuthValue;
-  fieldIds: unknown[];
-  purpose: FieldPurpose;
-}): Promise<InputPropertyMap> {
-  const validFieldIds = fieldIds.filter(
-    (fieldId): fieldId is string => typeof fieldId === 'string'
-  );
-  const entries = await Promise.all(
-    validFieldIds.map((fieldId) => buildFieldProps({ auth, fieldId, purpose }))
-  );
-  return Object.fromEntries(entries.flat());
 }
 
 async function buildFieldProps({
@@ -299,7 +284,14 @@ async function buildFieldProps({
   if (!target) return [];
 
   const operatorOptions =
-    purpose === 'filter' ? buildFieldOperatorOptions({ field }) : [];
+    purpose === 'filter'
+      ? (OPERATORS_BY_TYPE[field.type] ?? TEXT_OPERATORS).map((operator) => ({
+          label: OPERATORS[operator].label,
+          description: OPERATORS[operator].description,
+          value: operator,
+        }))
+      : [];
+
   const operatorProps: [string, InputProperty][] =
     operatorOptions.length === 0
       ? []
@@ -325,18 +317,6 @@ async function buildFieldProps({
     ...operatorProps,
     ...buildValueProps({ field, purpose }),
   ];
-}
-
-function buildFieldOperatorOptions({
-  field,
-}: {
-  field: TwentyMetadataField;
-}): OperatorOption[] {
-  return (OPERATORS_BY_TYPE[field.type] ?? TEXT_OPERATORS).map((operator) => ({
-    label: OPERATORS[operator].label,
-    description: OPERATORS[operator].description,
-    value: operator,
-  }));
 }
 
 function buildValueProps({
@@ -486,7 +466,5 @@ export type FieldInputsPropParams<R extends boolean> = PropParams<R> & {
 };
 
 type OperatorDefinition = { label: string; description: string };
-
-type OperatorOption = SelectOption & { description: string };
 
 type DatePresetOption = { label: string; value: number | 'custom' };

@@ -3,8 +3,8 @@ import { HttpMethod, QueryParams } from '@activepieces/pieces-common';
 import { twentyClient } from './client';
 
 import type {
-  FilterGroup,
-  FilterNode,
+  QueryConditionGroup,
+  QueryConditionNode,
   FieldValue,
   TwentyAuthValue,
   TwentyDuplicateConnection,
@@ -186,7 +186,7 @@ async function findRecords({
 }: {
   auth: TwentyAuthValue;
   objectNamePlural: string;
-  conditions: FilterNode[];
+  conditions: QueryConditionNode[];
 }): Promise<TwentyRecord[]> {
   return await listRecordItems({
     auth,
@@ -418,7 +418,7 @@ async function updateRecords({
 }: {
   auth: TwentyAuthValue;
   objectNamePlural: string;
-  conditions: FilterNode[];
+  conditions: QueryConditionNode[];
   recordValues: Record<string, unknown>;
 }): Promise<TwentyRecord[]> {
   const response = await twentyClient.request<TwentyEnvelope<TwentyRecord[]>>({
@@ -730,30 +730,34 @@ function recordsPath({
 function filterQuery({
   conditions,
 }: {
-  conditions: FilterNode[];
+  conditions: QueryConditionNode[];
 }): QueryParams {
   const filter = conditions
-    .flatMap((node) => pruneFilterNode({ node }))
-    .map((node) => renderFilterNode({ node }))
+    .flatMap((node) => pruneConditionNode({ node }))
+    .map((node) => renderConditionNode({ node }))
     .join(',');
   return filter ? { filter } : {};
 }
 
-function pruneFilterNode({ node }: { node: FilterNode }): FilterNode[] {
-  if (!isFilterGroup(node))
+function pruneConditionNode({
+  node,
+}: {
+  node: QueryConditionNode;
+}): QueryConditionNode[] {
+  if (!isConditionGroup(node))
     return isEmptyFieldValue({ value: node.value }) ? [] : [node];
   const conditions = node.conditions.flatMap((child) =>
-    pruneFilterNode({ node: child })
+    pruneConditionNode({ node: child })
   );
   if (conditions.length === 0) return [];
   if (conditions.length === 1 && node.conjunction !== 'not') return conditions;
   return [{ conjunction: node.conjunction, conditions }];
 }
 
-function renderFilterNode({ node }: { node: FilterNode }): string {
-  if (isFilterGroup(node))
+function renderConditionNode({ node }: { node: QueryConditionNode }): string {
+  if (isConditionGroup(node))
     return `${node.conjunction}(${node.conditions
-      .map((child) => renderFilterNode({ node: child }))
+      .map((child) => renderConditionNode({ node: child }))
       .join(',')})`;
   const { field, operator, value } = node;
   return `${field}[${operator}]:${
@@ -761,7 +765,9 @@ function renderFilterNode({ node }: { node: FilterNode }): string {
   }`;
 }
 
-function isFilterGroup(node: FilterNode): node is FilterGroup {
+function isConditionGroup(
+  node: QueryConditionNode
+): node is QueryConditionGroup {
   return 'conjunction' in node;
 }
 

@@ -59,7 +59,7 @@ export const updateRecord = createAction({
     if (!twentyMetadataUtils.isObjectRef(object))
       throw new Error('Select an object.');
 
-    const recordValues = recordParamsUtils.toRecordValues({ values: values ?? {} });
+    const recordValues = recordParamsUtils.parseRecordValues({ input: values ?? {} });
     if (Object.keys(recordValues).length === 0)
       return await twentyApi.getRecord({
         auth: context.auth,

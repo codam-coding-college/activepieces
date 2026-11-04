@@ -53,7 +53,7 @@ export const createRecord = createAction({
     return await twentyApi.createRecord({
       auth: context.auth,
       objectNamePlural: object.namePlural,
-      recordValues: recordParamsUtils.toRecordValues({ values: values ?? {} }),
+      recordValues: recordParamsUtils.parseRecordValues({ input: values ?? {} }),
     });
   },
 });

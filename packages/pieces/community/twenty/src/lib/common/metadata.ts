@@ -94,15 +94,6 @@ function getCompositeSubfields({
   return COMPOSITE_SUBFIELDS[field.type];
 }
 
-function getJoinColumnName({
-  field,
-}: {
-  field: TwentyMetadataField;
-}): string | undefined {
-  const joinColumnName = field.settings?.['joinColumnName'];
-  return typeof joinColumnName === 'string' ? joinColumnName : undefined;
-}
-
 function resolveFieldTarget({
   field,
 }: {
@@ -111,10 +102,10 @@ function resolveFieldTarget({
   const label =
     typeof field['label'] === 'string' ? field['label'] : field.name;
   if (field.type !== 'RELATION') return { key: field.name, label };
-  const joinColumnName = getJoinColumnName({ field });
-  return joinColumnName
-    ? { key: joinColumnName, label: `${label} ID` }
-    : undefined;
+  const joinColumnName = field.settings?.['joinColumnName'];
+  if (typeof joinColumnName !== 'string') return undefined;
+
+  return { key: joinColumnName, label: `${label} ID` };
 }
 
 function buildSelectOptions({

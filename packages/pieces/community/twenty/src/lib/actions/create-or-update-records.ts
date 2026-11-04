@@ -4,7 +4,7 @@ import { twentyApi } from '../common/api';
 import { twentyMetadataUtils } from '../common/metadata';
 import { recordParamsUtils } from '../common/record-params';
 import { twentyRecordProps } from '../common/record-props';
-import { FilterNode, TwentyAuthValue, TwentyRecord } from '../common/types';
+import { QueryConditionNode, TwentyAuthValue, TwentyRecord } from '../common/types';
 
 export const createOrUpdateRecords = createAction({
   auth: twentyAuth,
@@ -76,13 +76,13 @@ export const createOrUpdateRecords = createAction({
     if (!twentyMetadataUtils.isObjectRef(object))
       throw new Error('Select an object.');
 
-    const conditions = recordParamsUtils.toFilterConditions({
-      conditions: filters ?? {},
+    const conditions = recordParamsUtils.parseQueryConditions({
+      input: filters ?? {},
     });
     if (conditions.length === 0)
       throw new Error('Set at least one filter to match records on.');
 
-    const recordValues = recordParamsUtils.toRecordValues({ values: values ?? {} });
+    const recordValues = recordParamsUtils.parseRecordValues({ input: values ?? {} });
     const params = {
       auth: context.auth,
       objectNamePlural: object.namePlural,
@@ -112,7 +112,7 @@ async function updateSingleMatch({
 }: {
   auth: TwentyAuthValue;
   objectNamePlural: string;
-  conditions: FilterNode[];
+  conditions: QueryConditionNode[];
   recordValues: Record<string, unknown>;
 }): Promise<TwentyRecord[]> {
   const found = await twentyApi.findRecords({

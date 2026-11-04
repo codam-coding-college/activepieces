@@ -53,8 +53,8 @@ export const findRecords = createAction({
     return await twentyApi.findRecords({
       auth: context.auth,
       objectNamePlural: object.namePlural,
-      conditions: recordParamsUtils.toFilterConditions({
-        conditions: filters ?? {},
+      conditions: recordParamsUtils.parseQueryConditions({
+        input: filters ?? {},
       }),
     });
   },

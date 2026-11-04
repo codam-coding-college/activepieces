@@ -83,7 +83,7 @@ export type TwentyObjectRef = {
 
 export type FieldPurpose = 'filter' | 'write';
 
-export type FilterOperator =
+export type QueryOperator =
   | 'eq'
   | 'neq'
   | 'in'
@@ -104,13 +104,13 @@ export type FieldEntry = {
   value: FieldValue | undefined;
 };
 
-export type FilterCondition = FieldEntry & { operator: FilterOperator };
+export type QueryCondition = FieldEntry & { operator: QueryOperator };
 
-export type FilterConjunction = 'and' | 'or' | 'not';
+export type QueryConjunction = 'and' | 'or' | 'not';
 
-export type FilterGroup = {
-  conjunction: FilterConjunction;
-  conditions: FilterNode[];
+export type QueryConditionGroup = {
+  conjunction: QueryConjunction;
+  conditions: QueryConditionNode[];
 };
 
-export type FilterNode = FilterCondition | FilterGroup;
+export type QueryConditionNode = QueryCondition | QueryConditionGroup;
