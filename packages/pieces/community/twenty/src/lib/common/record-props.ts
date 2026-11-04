@@ -11,7 +11,6 @@ import { twentyMetadataUtils } from './metadata';
 import {
   FieldPurpose,
   QueryOperator,
-  SelectOption,
   TwentyAuthValue,
   TwentyMetadataField,
 } from './types';

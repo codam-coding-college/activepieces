@@ -141,7 +141,7 @@ function expandToAdditionalValues({
   }).map(
     (pattern): QueryCondition => ({
       field: additionalField,
-      operator: 'like',
+      operator: condition.operator === 'ilike' ? 'ilike' : 'like',
       value: pattern,
     })
   );
@@ -182,16 +182,20 @@ function additionalValuePatterns({
       case 'eq':
       case 'neq':
       case 'in':
-        return [`%"${item}"%`];
+        return [`%"${escapeLikeValue(item)}"%`];
       case 'startsWith':
-        return [`%"${item}%`];
+        return [`%"${escapeLikeValue(item)}%`];
       case 'like':
       case 'ilike':
-        return [item.includes('%') ? item : `%"${item}"%`];
+        return [item.includes('%') ? item : `%"${escapeLikeValue(item)}"%`];
       default:
         return [];
     }
   });
+}
+
+function escapeLikeValue(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&');
 }
 
 function toDateRangeConditions({

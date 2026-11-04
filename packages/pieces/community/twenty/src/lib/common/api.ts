@@ -760,6 +760,10 @@ function renderConditionNode({ node }: { node: QueryConditionNode }): string {
       .map((child) => renderConditionNode({ node: child }))
       .join(',')})`;
   const { field, operator, value } = node;
+  if (operator === 'ilike' || operator === 'like') {
+    return `${field}[${operator}]:"${value}"`;
+  }
+
   return `${field}[${operator}]:${
     operator === 'is' ? value : JSON.stringify(value)
   }`;
