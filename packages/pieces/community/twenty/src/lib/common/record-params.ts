@@ -87,6 +87,7 @@ function parseQueryConditions({
           operator,
           value: splitListValue({ operator, value }),
         };
+        if (isEmptyValue(condition.value)) return [];
 
         const additionalSubfield = ADDITIONAL_VALUE_SUBFIELDS[part];
         return [

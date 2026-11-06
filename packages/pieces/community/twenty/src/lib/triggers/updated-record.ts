@@ -13,14 +13,10 @@ import { twentyAuth } from '../auth';
 import { twentyRecordProps } from '../common/record-props';
 import { twentyApi } from '../common/api';
 import { twentyMetadataUtils } from '../common/metadata';
-import {
-  TwentyDiffCache,
-  TwentyTimelineActivity,
-  TwentyTimelineDiff,
-} from '../common/types';
+import { TwentyDiffCache } from '../common/types';
+import { twentyTimelineUtils } from '../common/timeline';
 import dayjs from 'dayjs';
 
-const CACHE_LIFETIME = 15 * 60 * 1000;
 const SETTLE_DELAY_MS = 30 * 1000;
 const DIFF_CACHE_KEY = 'twenty_timeline_diff_cache';
 const CURSOR_KEY = 'twenty_timeline_cursor';
@@ -81,12 +77,12 @@ const polling: Polling<
               : [{ ...activity, diff }];
           });
 
-    const changed = findNewChanges({ activities, cache });
+    const changed = twentyTimelineUtils.findNewChanges({ activities, cache });
     await store.put(
       DIFF_CACHE_KEY,
-      nextDiffCache({ cache, changed, now: Date.now() })
+      twentyTimelineUtils.nextDiffCache({ cache, changed, now: Date.now() })
     );
-    const grouped = groupChangesByRecord({ changed });
+    const grouped = twentyTimelineUtils.groupChangesByRecord({ changed });
 
     const records = await twentyApi.getRecordsByIds({
       auth,
@@ -188,113 +184,3 @@ export const updatedRecordTrigger = createTrigger({
     return await pollingHelper.poll(polling, context);
   },
 });
-
-function findNewChanges({
-  activities,
-  cache,
-}: {
-  activities: TwentyTimelineActivity[];
-  cache: TwentyDiffCache;
-}): ActivityChanges[] {
-  return activities.flatMap((activity) => {
-    const cachedActivity = cache[activity.id];
-
-    const changes = Object.fromEntries(
-      Object.entries(activity.diff).flatMap(([key, change]) => {
-        const isCached =
-          cachedActivity !== undefined && key in cachedActivity.values;
-        if (
-          isCached &&
-          JSON.stringify(cachedActivity.values[key]) ===
-            JSON.stringify(change.after)
-        )
-          return [];
-
-        const before = isCached ? cachedActivity.values[key] : change.before;
-        return [[key, { before, after: change.after }]];
-      })
-    );
-
-    if (Object.keys(changes).length === 0) return [];
-    return [{ activity, changes }];
-  });
-}
-
-function nextDiffCache({
-  cache,
-  changed,
-  now,
-}: {
-  cache: TwentyDiffCache;
-  changed: ActivityChanges[];
-  now: number;
-}): TwentyDiffCache {
-  return {
-    ...Object.fromEntries(
-      Object.entries(cache).filter(
-        ([, entry]) => now - entry.createdAt <= CACHE_LIFETIME
-      )
-    ),
-    ...Object.fromEntries(
-      changed.map(({ activity, changes }) => [
-        activity.id,
-        {
-          values: {
-            ...cache[activity.id]?.values,
-            ...Object.fromEntries(
-              Object.entries(changes).map(([key, diff]) => [key, diff.after])
-            ),
-          },
-          createdAt: dayjs(activity.createdAt).valueOf(),
-        },
-      ])
-    ),
-  };
-}
-
-function groupChangesByRecord({
-  changed,
-}: {
-  changed: ActivityChanges[];
-}): Map<string, RecordChanges> {
-  const grouped = new Map<string, RecordChanges>();
-  for (const { activity, changes } of changed) {
-    const found = grouped.get(activity.recordId);
-
-    const mergedChanges = Object.fromEntries(
-      Object.entries(changes).map(([key, diff]) => {
-        const earlier = found?.changes[key];
-
-        return [
-          key,
-          {
-            before: earlier !== undefined ? earlier.before : diff.before,
-            after: diff.after,
-          },
-        ];
-      })
-    );
-    grouped.set(activity.recordId, {
-      changes: { ...found?.changes, ...mergedChanges },
-      workspaceMemberIds: [
-        ...new Set([
-          ...(found?.workspaceMemberIds ?? []),
-          activity.workspaceMemberId,
-        ]),
-      ],
-      updatedAt: activity.updatedAt,
-    });
-  }
-  return grouped;
-}
-
-type RecordChanges = {
-  changes: TwentyTimelineDiff;
-  workspaceMemberIds: (string | null)[];
-  updatedAt: string;
-};
-
-type ActivityChanges = {
-  activity: TwentyTimelineActivity;
-  changes: TwentyTimelineDiff;
-};

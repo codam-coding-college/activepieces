@@ -2,7 +2,7 @@ import { HttpMethod, QueryParams } from '@activepieces/pieces-common';
 
 import dayjs from 'dayjs';
 import { twentyClient } from './client';
-import { twentyParsingUtils } from './parsing';
+import { twentyTimelineUtils } from './timeline';
 
 import type {
   QueryConditionGroup,
@@ -318,7 +318,7 @@ async function listRecords({
     }),
   });
   return {
-    records: twentyParsingUtils.firstValue({ envelope: response }) ?? [],
+    records: firstValue({ envelope: response }) ?? [],
     pageInfo: response.pageInfo,
     totalCount: response.totalCount,
   };
@@ -354,7 +354,7 @@ async function listTimelines({
     since
   );
   const activities = records.flatMap((record): TwentyTimelineActivity[] => {
-    const activity = twentyParsingUtils.toTimelineActivity({
+    const activity = twentyTimelineUtils.toTimelineActivity({
       record,
       targetColumn,
     });
@@ -401,7 +401,7 @@ async function getRecord({
     path: recordsPath({ objectNamePlural, recordId }),
     query: compactQuery({ values: { depth, fields } }),
   });
-  return twentyParsingUtils.firstValue({ envelope: response });
+  return firstValue({ envelope: response });
 }
 
 async function createRecord({
@@ -422,7 +422,7 @@ async function createRecord({
     query: compactQuery({ values: { upsert: upsert ? true : undefined } }),
     body: recordValues,
   });
-  return twentyParsingUtils.firstValue({ envelope: response });
+  return firstValue({ envelope: response });
 }
 
 async function createRecords({
@@ -443,7 +443,7 @@ async function createRecords({
     query: compactQuery({ values: { upsert: upsert ? true : undefined } }),
     body: recordValuesList,
   });
-  const created = twentyParsingUtils.firstValue({ envelope: response }) ?? [];
+  const created = firstValue({ envelope: response }) ?? [];
   return { records: created, count: created.length };
 }
 
@@ -470,7 +470,7 @@ async function updateRecord({
     path: recordsPath({ objectNamePlural, recordId }),
     body,
   });
-  return twentyParsingUtils.firstValue({ envelope: response });
+  return firstValue({ envelope: response });
 }
 
 async function updateRecords({
@@ -484,14 +484,20 @@ async function updateRecords({
   conditions: QueryConditionNode[];
   recordValues: Record<string, unknown>;
 }): Promise<TwentyRecord[]> {
+  const query = filterQuery({ conditions });
+  if (query['filter'] === undefined)
+    throw new Error(
+      'Set at least one filter. To update every record on purpose, filter on Created At is NOT_NULL.'
+    );
+
   const response = await twentyClient.request<TwentyEnvelope<TwentyRecord[]>>({
     auth,
     method: HttpMethod.PATCH,
     path: recordsPath({ objectNamePlural }),
-    query: filterQuery({ conditions }),
+    query,
     body: recordValues,
   });
-  return twentyParsingUtils.firstValue({ envelope: response }) ?? [];
+  return firstValue({ envelope: response }) ?? [];
 }
 
 async function deleteRecord({
@@ -510,7 +516,7 @@ async function deleteRecord({
       values: { soft_delete: permanent ? undefined : true },
     }),
   });
-  return twentyParsingUtils.firstValue({ envelope: response });
+  return firstValue({ envelope: response });
 }
 
 async function restoreRecord({
@@ -525,7 +531,7 @@ async function restoreRecord({
     method: HttpMethod.PATCH,
     path: `${recordsPath({ objectNamePlural, recordId })}/restore`,
   });
-  return twentyParsingUtils.firstValue({ envelope: response });
+  return firstValue({ envelope: response });
 }
 
 async function findDuplicateRecords({
@@ -586,7 +592,7 @@ async function mergeRecords({
     path: `${recordsPath({ objectNamePlural })}/merge`,
     body: { ids: recordIds, conflictPriorityIndex, dryRun: dryRun ?? false },
   });
-  return twentyParsingUtils.firstValue({ envelope: response });
+  return firstValue({ envelope: response });
 }
 
 async function groupRecords({
@@ -685,7 +691,7 @@ async function getObjectFields({
   const object = await getObject({ auth, objectId });
   const fields = object['fields'];
   return Array.isArray(fields)
-    ? fields.filter(twentyParsingUtils.isMetadataField)
+    ? fields.filter(isMetadataField)
     : [];
 }
 
@@ -773,13 +779,34 @@ async function listMetadata({
   });
   const items = Array.isArray(response.data)
     ? response.data
-    : twentyParsingUtils.firstValue({ envelope: { data: response.data } }) ??
+    : firstValue({ envelope: { data: response.data } }) ??
       [];
   return {
     items,
     pageInfo: response.pageInfo,
     totalCount: response.totalCount,
   };
+}
+
+function firstValue<T>({
+  envelope,
+}: {
+  envelope: TwentyEnvelope<T>;
+}): T | undefined {
+  return Object.values(envelope.data)[0];
+}
+
+function isMetadataField(value: unknown): value is TwentyMetadataField {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'name' in value &&
+    typeof value.name === 'string' &&
+    'type' in value &&
+    typeof value.type === 'string'
+  );
 }
 
 function recordsPath({
