@@ -199,6 +199,54 @@ describe('updateRecords', () => {
   });
 });
 
+describe('deleteRecords', () => {
+  it('never sends a bulk delete without a filter', async () => {
+    const result = twentyApi.deleteRecords({
+      auth,
+      objectNamePlural: 'people',
+      conditions: [{ field: 'city', operator: 'eq', value: '' }],
+    });
+
+    await expect(result).rejects.toThrow();
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('moves the matching records to the trash', async () => {
+    request.mockResolvedValueOnce({ data: { deletePeople: [{ id: '1' }] } });
+
+    const result = await twentyApi.deleteRecords({
+      auth,
+      objectNamePlural: 'people',
+      conditions: [{ field: 'city', operator: 'eq', value: 'Paris' }],
+    });
+
+    expect(result).toEqual([{ id: '1' }]);
+    expect(request).toHaveBeenCalledWith({
+      auth,
+      method: HttpMethod.DELETE,
+      path: '/rest/people',
+      query: { filter: 'city[eq]:"Paris"', soft_delete: 'true' },
+    });
+  });
+
+});
+
+describe('emptyTrash', () => {
+  it('permanently deletes only the records that are in the trash', async () => {
+    request.mockResolvedValueOnce({ data: { deletePeople: [{ id: '1' }] } });
+
+    const result = await twentyApi.emptyTrash({ auth, objectNamePlural: 'people' });
+
+    expect(result).toEqual([{ id: '1' }]);
+    expect(request).toHaveBeenCalledWith({
+      auth,
+      method: HttpMethod.DELETE,
+      path: '/rest/people',
+      query: { filter: 'deletedAt[is]:NOT_NULL' },
+    });
+  });
+});
+
 describe('getRecordsByIds', () => {
   it('makes no request for an empty id list', async () => {
     const result = await twentyApi.getRecordsByIds({

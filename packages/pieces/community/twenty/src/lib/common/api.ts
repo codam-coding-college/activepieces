@@ -500,6 +500,48 @@ async function updateRecords({
   return firstValue({ envelope: response }) ?? [];
 }
 
+async function deleteRecords({
+  auth,
+  objectNamePlural,
+  conditions,
+}: {
+  auth: TwentyAuthValue;
+  objectNamePlural: string;
+  conditions: QueryConditionNode[];
+}): Promise<TwentyRecord[]> {
+  const filter = filterQuery({ conditions });
+  if (filter['filter'] === undefined)
+    throw new Error(
+      'Set at least one filter. To delete every record on purpose, filter on Created At is NOT_NULL.'
+    );
+
+  const response = await twentyClient.request<TwentyEnvelope<TwentyRecord[]>>({
+    auth,
+    method: HttpMethod.DELETE,
+    path: recordsPath({ objectNamePlural }),
+    query: { ...filter, soft_delete: 'true' },
+  });
+  return firstValue({ envelope: response }) ?? [];
+}
+
+async function emptyTrash({
+  auth,
+  objectNamePlural,
+}: {
+  auth: TwentyAuthValue;
+  objectNamePlural: string;
+}): Promise<TwentyRecord[]> {
+  const response = await twentyClient.request<TwentyEnvelope<TwentyRecord[]>>({
+    auth,
+    method: HttpMethod.DELETE,
+    path: recordsPath({ objectNamePlural }),
+    query: filterQuery({
+      conditions: [{ field: 'deletedAt', operator: 'is', value: 'NOT_NULL' }],
+    }),
+  });
+  return firstValue({ envelope: response }) ?? [];
+}
+
 async function deleteRecord({
   auth,
   objectNamePlural,
@@ -690,9 +732,7 @@ async function getObjectFields({
 }): Promise<TwentyMetadataField[]> {
   const object = await getObject({ auth, objectId });
   const fields = object['fields'];
-  return Array.isArray(fields)
-    ? fields.filter(isMetadataField)
-    : [];
+  return Array.isArray(fields) ? fields.filter(isMetadataField) : [];
 }
 
 async function getField({
@@ -779,8 +819,7 @@ async function listMetadata({
   });
   const items = Array.isArray(response.data)
     ? response.data
-    : firstValue({ envelope: { data: response.data } }) ??
-      [];
+    : firstValue({ envelope: { data: response.data } }) ?? [];
   return {
     items,
     pageInfo: response.pageInfo,
@@ -932,6 +971,8 @@ export const twentyApi = {
   updateRecord,
   updateRecords,
   deleteRecord,
+  deleteRecords,
+  emptyTrash,
   restoreRecord,
   findDuplicateRecords,
   mergeRecords,
