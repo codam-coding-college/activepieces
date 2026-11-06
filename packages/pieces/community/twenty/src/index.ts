@@ -29,7 +29,7 @@ export const twenty = createPiece({
   minimumSupportedRelease: '0.88.2',
   logoUrl: 'https://cdn.activepieces.com/pieces/twenty.png',
   categories: [PieceCategory.SALES_AND_CRM],
-  authors: ['Akash5908'],
+  authors: ['Akash5908', 'bjacobs42'],
   actions: [
     createRecord,
     createContactAction,

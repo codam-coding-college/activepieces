@@ -1,6 +1,8 @@
 import { HttpMethod, QueryParams } from '@activepieces/pieces-common';
 
+import dayjs from 'dayjs';
 import { twentyClient } from './client';
+import { twentyParsingUtils } from './parsing';
 
 import type {
   QueryConditionGroup,
@@ -20,6 +22,7 @@ import type {
   TwentyRecordList,
   TwentyRecordPage,
   TwentyResponse,
+  TwentyTimelineActivity,
 } from './types';
 
 async function checkConnection({
@@ -315,10 +318,70 @@ async function listRecords({
     }),
   });
   return {
-    records: firstValue({ envelope: response }) ?? [],
+    records: twentyParsingUtils.firstValue({ envelope: response }) ?? [],
     pageInfo: response.pageInfo,
     totalCount: response.totalCount,
   };
+}
+
+async function listTimelines({
+  auth,
+  targetColumn,
+  since,
+  until,
+}: {
+  auth: TwentyAuthValue;
+  targetColumn: string;
+  since: number;
+  until: number;
+}): Promise<{ activities: TwentyTimelineActivity[]; cursor: number }> {
+  const filter = `${targetColumn}[is]:NOT_NULL,linkedRecordId[is]:NULL,updatedAt[gt]:${JSON.stringify(
+    new Date(since).toISOString()
+  )},updatedAt[lte]:${JSON.stringify(new Date(until).toISOString())}`;
+  const { records } = await listRecords({
+    auth,
+    objectNamePlural: 'timelineActivities',
+    orderBy: 'updatedAt[AscNullsLast]',
+    filter,
+    limit: 100,
+  });
+
+  const cursor = records.reduce(
+    (newest, record) =>
+      typeof record.updatedAt === 'string'
+        ? Math.max(newest, dayjs(record.updatedAt).valueOf())
+        : newest,
+    since
+  );
+  const activities = records.flatMap((record): TwentyTimelineActivity[] => {
+    const activity = twentyParsingUtils.toTimelineActivity({
+      record,
+      targetColumn,
+    });
+    return activity ? [activity] : [];
+  });
+
+  return { activities, cursor };
+}
+
+async function getRecordsByIds({
+  auth,
+  objectNamePlural,
+  recordIds,
+}: {
+  auth: TwentyAuthValue;
+  objectNamePlural: string;
+  recordIds: string[];
+}): Promise<TwentyRecord[]> {
+  if (recordIds.length === 0) return [];
+
+  const { records } = await listRecords({
+    auth,
+    objectNamePlural,
+    filter: `id[in]:[${recordIds.map((id) => JSON.stringify(id)).join(',')}]`,
+    limit: recordIds.length,
+  });
+  return records;
 }
 
 async function getRecord({
@@ -338,7 +401,7 @@ async function getRecord({
     path: recordsPath({ objectNamePlural, recordId }),
     query: compactQuery({ values: { depth, fields } }),
   });
-  return firstValue({ envelope: response });
+  return twentyParsingUtils.firstValue({ envelope: response });
 }
 
 async function createRecord({
@@ -359,7 +422,7 @@ async function createRecord({
     query: compactQuery({ values: { upsert: upsert ? true : undefined } }),
     body: recordValues,
   });
-  return firstValue({ envelope: response });
+  return twentyParsingUtils.firstValue({ envelope: response });
 }
 
 async function createRecords({
@@ -380,7 +443,7 @@ async function createRecords({
     query: compactQuery({ values: { upsert: upsert ? true : undefined } }),
     body: recordValuesList,
   });
-  const created = firstValue({ envelope: response }) ?? [];
+  const created = twentyParsingUtils.firstValue({ envelope: response }) ?? [];
   return { records: created, count: created.length };
 }
 
@@ -407,7 +470,7 @@ async function updateRecord({
     path: recordsPath({ objectNamePlural, recordId }),
     body,
   });
-  return firstValue({ envelope: response });
+  return twentyParsingUtils.firstValue({ envelope: response });
 }
 
 async function updateRecords({
@@ -428,7 +491,7 @@ async function updateRecords({
     query: filterQuery({ conditions }),
     body: recordValues,
   });
-  return firstValue({ envelope: response }) ?? [];
+  return twentyParsingUtils.firstValue({ envelope: response }) ?? [];
 }
 
 async function deleteRecord({
@@ -447,7 +510,7 @@ async function deleteRecord({
       values: { soft_delete: permanent ? undefined : true },
     }),
   });
-  return firstValue({ envelope: response });
+  return twentyParsingUtils.firstValue({ envelope: response });
 }
 
 async function restoreRecord({
@@ -462,7 +525,7 @@ async function restoreRecord({
     method: HttpMethod.PATCH,
     path: `${recordsPath({ objectNamePlural, recordId })}/restore`,
   });
-  return firstValue({ envelope: response });
+  return twentyParsingUtils.firstValue({ envelope: response });
 }
 
 async function findDuplicateRecords({
@@ -523,7 +586,7 @@ async function mergeRecords({
     path: `${recordsPath({ objectNamePlural })}/merge`,
     body: { ids: recordIds, conflictPriorityIndex, dryRun: dryRun ?? false },
   });
-  return firstValue({ envelope: response });
+  return twentyParsingUtils.firstValue({ envelope: response });
 }
 
 async function groupRecords({
@@ -621,7 +684,9 @@ async function getObjectFields({
 }): Promise<TwentyMetadataField[]> {
   const object = await getObject({ auth, objectId });
   const fields = object['fields'];
-  return Array.isArray(fields) ? fields.filter(isMetadataField) : [];
+  return Array.isArray(fields)
+    ? fields.filter(twentyParsingUtils.isMetadataField)
+    : [];
 }
 
 async function getField({
@@ -708,7 +773,8 @@ async function listMetadata({
   });
   const items = Array.isArray(response.data)
     ? response.data
-    : firstValue({ envelope: { data: response.data } }) ?? [];
+    : twentyParsingUtils.firstValue({ envelope: { data: response.data } }) ??
+      [];
   return {
     items,
     pageInfo: response.pageInfo,
@@ -804,27 +870,6 @@ function appendArrayFields({
   );
 }
 
-function isMetadataField(value: unknown): value is TwentyMetadataField {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'id' in value &&
-    typeof value.id === 'string' &&
-    'name' in value &&
-    typeof value.name === 'string' &&
-    'type' in value &&
-    typeof value.type === 'string'
-  );
-}
-
-function firstValue<T>({
-  envelope,
-}: {
-  envelope: TwentyEnvelope<T>;
-}): T | undefined {
-  return Object.values(envelope.data)[0];
-}
-
 function compactQuery({
   values,
 }: {
@@ -852,6 +897,8 @@ export const twentyApi = {
   updateCompany,
   updatePerson,
   listRecords,
+  listTimelines,
+  getRecordsByIds,
   getRecord,
   createRecord,
   createRecords,

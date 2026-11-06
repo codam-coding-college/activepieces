@@ -9,36 +9,108 @@ import {
   Polling,
   pollingHelper,
 } from '@activepieces/pieces-common';
-import dayjs from 'dayjs';
 import { twentyAuth } from '../auth';
 import { twentyRecordProps } from '../common/record-props';
 import { twentyApi } from '../common/api';
 import { twentyMetadataUtils } from '../common/metadata';
+import {
+  TwentyDiffCache,
+  TwentyTimelineActivity,
+  TwentyTimelineDiff,
+} from '../common/types';
+import dayjs from 'dayjs';
 
-const props = { object: twentyRecordProps.object({ required: true }) };
+const CACHE_LIFETIME = 15 * 60 * 1000;
+const SETTLE_DELAY_MS = 30 * 1000;
+const DIFF_CACHE_KEY = 'twenty_timeline_diff_cache';
+const CURSOR_KEY = 'twenty_timeline_cursor';
+
+const props = {
+  object: twentyRecordProps.object({ required: true }),
+  fields: twentyRecordProps.fields({
+    required: false,
+    displayName: 'Listen On',
+    description:
+      'Only trigger when one of these fields changes. Leave empty to trigger on any change.',
+    purpose: 'write',
+  }),
+};
+
 const polling: Polling<
   AppConnectionValueForAuthProperty<typeof twentyAuth>,
   StaticPropsValue<typeof props>
 > = {
   strategy: DedupeStrategy.TIMEBASED,
-  items: async ({ auth, propsValue, lastFetchEpochMS }) => {
+  items: async ({ auth, propsValue, lastFetchEpochMS, store }) => {
     const object = propsValue.object;
-
     if (!twentyMetadataUtils.isObjectRef(object))
       throw new Error('Select an object.');
-    const items = (
-      await twentyApi.listRecords({
-        auth,
-        objectNamePlural: object.namePlural,
-        orderBy: 'updatedAt[AscNullsLast]',
-        filter: `updatedAt[gt]:"${new Date(lastFetchEpochMS).toISOString()}"`,
-        limit: 100,
-      })
-    ).records;
-    return items.map((item) => ({
-      epochMilliSeconds: dayjs(item.updatedAt).valueOf(),
-      data: item,
-    }));
+
+    const targetColumn = twentyMetadataUtils.createTargetColumn({
+      nameSingular: object.nameSingular,
+    });
+    const trackedKeys = (propsValue.fields ?? [])
+      .filter(twentyMetadataUtils.isFieldRef)
+      .map((ref) => ref.key);
+
+    const cache = (await store.get<TwentyDiffCache>(DIFF_CACHE_KEY)) ?? {};
+    const cursor = Math.max(
+      (await store.get<number>(CURSOR_KEY)) ?? 0,
+      lastFetchEpochMS
+    );
+    const timelines = await twentyApi.listTimelines({
+      auth,
+      targetColumn,
+      since: cursor,
+      until: Date.now() - SETTLE_DELAY_MS,
+    });
+    await store.put(CURSOR_KEY, timelines.cursor);
+
+    const activities =
+      trackedKeys.length === 0
+        ? timelines.activities
+        : timelines.activities.flatMap((activity) => {
+            const diff = Object.fromEntries(
+              Object.entries(activity.diff).filter(([key]) =>
+                trackedKeys.includes(key)
+              )
+            );
+
+            return Object.keys(diff).length === 0
+              ? []
+              : [{ ...activity, diff }];
+          });
+
+    const changed = findNewChanges({ activities, cache });
+    await store.put(
+      DIFF_CACHE_KEY,
+      nextDiffCache({ cache, changed, now: Date.now() })
+    );
+    const grouped = groupChangesByRecord({ changed });
+
+    const records = await twentyApi.getRecordsByIds({
+      auth,
+      objectNamePlural: object.namePlural,
+      recordIds: [...grouped.keys()],
+    });
+    const recordsById = new Map(
+      records.flatMap((record) =>
+        typeof record.id === 'string' ? [[record.id, record]] : []
+      )
+    );
+    return [...grouped].flatMap(
+      ([recordId, { changes, workspaceMemberIds, updatedAt }]) => {
+        const record = recordsById.get(recordId);
+        if (record === undefined) return [];
+
+        return [
+          {
+            epochMilliSeconds: dayjs(updatedAt).valueOf(),
+            data: { record, changes, workspaceMemberIds },
+          },
+        ];
+      }
+    );
   },
 };
 
@@ -48,34 +120,58 @@ export const updatedRecordTrigger = createTrigger({
   displayName: 'Updated Record',
   classification: 'READ',
   description:
-    'Triggers when a record of the selected object is created or updated in Twenty CRM.',
+    'Triggers when fields of a record of the selected object change in Twenty CRM, with their old and new values.',
   aiMetadata: {
     description:
-      'Fires when a record of the selected object (people, companies, opportunities or a custom object) is created or updated in the connected Twenty CRM workspace. Polls for records by their updated time and emits one event per changed record with its current field values; several changes between two polls arrive as one event.',
+      'Fires when fields of an existing record of the selected object (people, companies, opportunities or a custom object) change in the connected Twenty CRM workspace, optionally only for the selected fields. Reads the workspace timeline, so the object must have audit logging enabled and the API key needs read access to every object and field. Emits one event per changed record with the current record, each changed field as before and after, and the workspace members who changed it; several changes to the same record between two polls arrive as one event. New records do not fire it; use New Record for those.',
   },
   props,
+  propertyGroups: [
+    {
+      key: 'object',
+      display: 'section',
+      label: 'Object',
+      icon: 'tag',
+      props: ['object'],
+    },
+    {
+      key: 'tracking',
+      display: 'section',
+      label: 'Fields',
+      icon: 'filter',
+      props: ['fields'],
+    },
+  ],
   sampleData: {
-    id: '20202020-1c25-4d02-bf25-6aeccf7ea419',
-    name: { firstName: 'Alice', lastName: 'Doe' },
-    emails: { primaryEmail: 'alice@example.com', additionalEmails: [] },
-    jobTitle: 'Account Manager',
-    position: 1,
-    createdBy: {
-      source: 'MANUAL',
-      name: 'Jane Smith',
-      workspaceMemberId: '20202020-0687-4c41-b707-ed1bfca972a7',
+    record: {
+      id: '20202020-1c25-4d02-bf25-6aeccf7ea419',
+      name: { firstName: 'Alice', lastName: 'Doe' },
+      emails: { primaryEmail: 'alice@example.com', additionalEmails: [] },
+      jobTitle: 'Account Manager',
+      position: 1,
+      createdBy: {
+        source: 'MANUAL',
+        name: 'Jane Smith',
+        workspaceMemberId: '20202020-0687-4c41-b707-ed1bfca972a7',
+      },
+      updatedBy: {
+        source: 'MANUAL',
+        name: 'Jane Smith',
+        workspaceMemberId: '20202020-0687-4c41-b707-ed1bfca972a7',
+      },
+      createdAt: '2026-10-01T09:00:00.000Z',
+      updatedAt: '2026-11-02T10:15:30.000Z',
+      deletedAt: null,
     },
-    updatedBy: {
-      source: 'MANUAL',
-      name: 'Jane Smith',
-      workspaceMemberId: '20202020-0687-4c41-b707-ed1bfca972a7',
+    changes: {
+      jobTitle: { before: 'Sales Representative', after: 'Account Manager' },
     },
-    createdAt: '2026-10-01T09:00:00.000Z',
-    updatedAt: '2026-11-02T10:15:30.000Z',
-    deletedAt: null,
+    workspaceMemberIds: ['20202020-0687-4c41-b707-ed1bfca972a7'],
   },
   type: TriggerStrategy.POLLING,
   async test(context) {
+    await context.store.delete(DIFF_CACHE_KEY);
+    await context.store.delete(CURSOR_KEY);
     return await pollingHelper.test(polling, context);
   },
   async onEnable(context) {
@@ -83,6 +179,8 @@ export const updatedRecordTrigger = createTrigger({
   },
 
   async onDisable(context) {
+    await context.store.delete(DIFF_CACHE_KEY);
+    await context.store.delete(CURSOR_KEY);
     await pollingHelper.onDisable(polling, context);
   },
 
@@ -90,3 +188,113 @@ export const updatedRecordTrigger = createTrigger({
     return await pollingHelper.poll(polling, context);
   },
 });
+
+function findNewChanges({
+  activities,
+  cache,
+}: {
+  activities: TwentyTimelineActivity[];
+  cache: TwentyDiffCache;
+}): ActivityChanges[] {
+  return activities.flatMap((activity) => {
+    const cachedActivity = cache[activity.id];
+
+    const changes = Object.fromEntries(
+      Object.entries(activity.diff).flatMap(([key, change]) => {
+        const isCached =
+          cachedActivity !== undefined && key in cachedActivity.values;
+        if (
+          isCached &&
+          JSON.stringify(cachedActivity.values[key]) ===
+            JSON.stringify(change.after)
+        )
+          return [];
+
+        const before = isCached ? cachedActivity.values[key] : change.before;
+        return [[key, { before, after: change.after }]];
+      })
+    );
+
+    if (Object.keys(changes).length === 0) return [];
+    return [{ activity, changes }];
+  });
+}
+
+function nextDiffCache({
+  cache,
+  changed,
+  now,
+}: {
+  cache: TwentyDiffCache;
+  changed: ActivityChanges[];
+  now: number;
+}): TwentyDiffCache {
+  return {
+    ...Object.fromEntries(
+      Object.entries(cache).filter(
+        ([, entry]) => now - entry.createdAt <= CACHE_LIFETIME
+      )
+    ),
+    ...Object.fromEntries(
+      changed.map(({ activity, changes }) => [
+        activity.id,
+        {
+          values: {
+            ...cache[activity.id]?.values,
+            ...Object.fromEntries(
+              Object.entries(changes).map(([key, diff]) => [key, diff.after])
+            ),
+          },
+          createdAt: dayjs(activity.createdAt).valueOf(),
+        },
+      ])
+    ),
+  };
+}
+
+function groupChangesByRecord({
+  changed,
+}: {
+  changed: ActivityChanges[];
+}): Map<string, RecordChanges> {
+  const grouped = new Map<string, RecordChanges>();
+  for (const { activity, changes } of changed) {
+    const found = grouped.get(activity.recordId);
+
+    const mergedChanges = Object.fromEntries(
+      Object.entries(changes).map(([key, diff]) => {
+        const earlier = found?.changes[key];
+
+        return [
+          key,
+          {
+            before: earlier !== undefined ? earlier.before : diff.before,
+            after: diff.after,
+          },
+        ];
+      })
+    );
+    grouped.set(activity.recordId, {
+      changes: { ...found?.changes, ...mergedChanges },
+      workspaceMemberIds: [
+        ...new Set([
+          ...(found?.workspaceMemberIds ?? []),
+          activity.workspaceMemberId,
+        ]),
+      ],
+      updatedAt: activity.updatedAt,
+    });
+  }
+  return grouped;
+}
+
+type RecordChanges = {
+  changes: TwentyTimelineDiff;
+  workspaceMemberIds: (string | null)[];
+  updatedAt: string;
+};
+
+type ActivityChanges = {
+  activity: TwentyTimelineActivity;
+  changes: TwentyTimelineDiff;
+};

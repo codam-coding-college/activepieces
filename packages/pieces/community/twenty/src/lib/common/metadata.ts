@@ -3,6 +3,7 @@ import {
   FieldPurpose,
   SelectOption,
   TwentyAuthValue,
+  TwentyFieldRef,
   TwentyMetadataField,
   TwentyObjectRef,
 } from './types';
@@ -121,6 +122,16 @@ function buildSelectOptions({
   });
 }
 
+function createTargetColumn({
+  nameSingular,
+}: {
+  nameSingular: string;
+}): string {
+  return `target${nameSingular.charAt(0).toUpperCase()}${nameSingular.slice(
+    1
+  )}Id`;
+}
+
 function isObjectRef(value: unknown): value is TwentyObjectRef {
   return (
     typeof value === 'object' &&
@@ -131,6 +142,17 @@ function isObjectRef(value: unknown): value is TwentyObjectRef {
     typeof value.namePlural === 'string' &&
     'nameSingular' in value &&
     typeof value.nameSingular === 'string'
+  );
+}
+
+function isFieldRef(value: unknown): value is TwentyFieldRef {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'key' in value &&
+    typeof value.key === 'string'
   );
 }
 
@@ -168,14 +190,22 @@ async function fieldOptions({
   auth: TwentyAuthValue;
   objectId: string;
   purpose: FieldPurpose;
-}): Promise<SelectOption[]> {
+}): Promise<FieldOption[]> {
   const fields = await twentyApi.getObjectFields({ auth, objectId });
   return fields
     .filter((field) => isFieldUsable({ field, purpose }))
-    .map((field) => ({
-      label: typeof field['label'] === 'string' ? field['label'] : field.name,
-      value: field.id,
-    }));
+    .flatMap((field) => {
+      const target = resolveFieldTarget({ field });
+      if (!target) return [];
+
+      return [
+        {
+          label:
+            typeof field['label'] === 'string' ? field['label'] : field.name,
+          value: { id: field.id, key: target.key },
+        },
+      ];
+    });
 }
 
 function isFieldUsable({
@@ -201,8 +231,10 @@ function isFieldUsable({
 export const twentyMetadataUtils = {
   getCompositeSubfields,
   resolveFieldTarget,
+  createTargetColumn,
   buildSelectOptions,
   isObjectRef,
+  isFieldRef,
   objectOptions,
   fieldOptions,
 };
@@ -218,3 +250,5 @@ export type CompositeSubfield = {
 export type FieldTarget = { key: string; label: string };
 
 export type ObjectOption = { label: string; value: TwentyObjectRef };
+
+export type FieldOption = { label: string; value: TwentyFieldRef };

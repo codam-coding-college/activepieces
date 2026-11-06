@@ -75,6 +75,11 @@ export type TwentyMetadataSingle = TwentyMetadataItem & {
 
 export type SelectOption = { label: string; value: string };
 
+export type TwentyFieldRef = {
+  id: string;
+  key: string;
+};
+
 export type TwentyObjectRef = {
   id: string;
   namePlural: string;
@@ -114,3 +119,21 @@ export type QueryConditionGroup = {
 };
 
 export type QueryConditionNode = QueryCondition | QueryConditionGroup;
+
+export type TwentyTimelineDiff = Record<
+  string,
+  { before: unknown; after: unknown }
+>;
+export type TwentyTimelineActivity = {
+  id: string;
+  recordId: string;
+  diff: TwentyTimelineDiff;
+  workspaceMemberId: string | null;
+  updatedAt: string;
+  createdAt: string;
+};
+
+export type TwentyDiffCache = Record<
+  string,
+  { values: Record<string, unknown>; createdAt: number }
+>;

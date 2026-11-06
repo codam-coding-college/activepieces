@@ -253,16 +253,14 @@ function fieldInputs<R extends boolean>({
     description,
     required,
     refreshers: [fieldsProp, objectProp],
-    props: async ({ auth, [fieldsProp]: fieldIds }) => {
-      if (!auth || !Array.isArray(fieldIds)) return {};
+    props: async ({ auth, [fieldsProp]: fieldRefs }) => {
+      if (!auth || !Array.isArray(fieldRefs)) return {};
 
-      const validFieldIds = fieldIds.filter(
-        (id): id is string => typeof id === 'string'
-      );
+      const fieldIds = fieldRefs
+        .filter(twentyMetadataUtils.isFieldRef)
+        .map((ref) => ref.id);
       const fieldProps = await Promise.all(
-        validFieldIds.map((id) =>
-          buildFieldProps({ auth, fieldId: id, purpose })
-        )
+        fieldIds.map((id) => buildFieldProps({ auth, fieldId: id, purpose }))
       );
       return Object.fromEntries(fieldProps.flat());
     },
