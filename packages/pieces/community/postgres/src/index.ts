@@ -9,6 +9,7 @@ import { getTables } from './lib/actions/get-tables';
 import { newRow } from './lib/triggers/new-row';
 import { postgresAuth } from './lib/auth';
 import { postgresAiActions } from './lib/actions/ai';
+import { updatedRows } from './lib/triggers/updated-rows';
 
 export { postgresAuth };
 
@@ -18,8 +19,17 @@ export const postgres = createPiece({
   minimumSupportedRelease: '0.88.2',
   categories: [PieceCategory.DEVELOPER_TOOLS],
   logoUrl: 'https://cdn.activepieces.com/pieces/postgres.png',
-  authors: ["AbdullahBitar", "Willianwg", "dentych", "kishanprmr", "AbdulTheActivePiecer", "khaledmashaly", "abuaboud"],
+  authors: [
+    "AbdullahBitar",
+    "Willianwg",
+    "dentych",
+    "kishanprmr",
+    "AbdulTheActivePiecer",
+    "khaledmashaly",
+    "abuaboud",
+    "bjacobs42"
+  ],
   auth: postgresAuth,
   actions: [findRows, insertRow, insertRows, updateRow, deleteRow, getTables, runQuery, ...postgresAiActions],
-  triggers: [newRow],
+  triggers: [newRow, updatedRows],
 });
